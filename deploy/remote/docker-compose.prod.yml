@@ -17,7 +17,12 @@
 #     join `edge` so it can reach them by container name. See deploy/README.md.
 
 services:
-  api:
+  # Service keys are hiredesq-prefixed (NOT bare api/web/worker): docker adds the
+  # SERVICE NAME as a network alias on every attached net, and these join the
+  # SHARED `edge` net. Bare `web`/`api` aliases collide with tradex's own upstreams
+  # on edge (tradex-nginx then proxies tradex.inflxr.com to hiredesq). The prefix
+  # keeps the only edge alias `hiredesq-*`. container_name stays for the vhost.
+  hiredesq-api:
     build:
       context: ./release/api
       dockerfile: ../../Dockerfile.api
@@ -54,6 +59,12 @@ services:
       # Transactional email (Resend) — password-reset links.
       RESEND_API_KEY: ${RESEND_API_KEY}
       RESEND_FROM: ${RESEND_FROM}
+      # Google "Sign in with Google" — server-side auth-code exchange
+      # (apps/api/src/common/google.ts). GOOGLE_CLIENT_SECRET is a secret (§6).
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      # Hosted logo PNG for transactional email headers (packages/core mail).
+      EMAIL_LOGO_URL: ${EMAIL_LOGO_URL}
     # No `depends_on` for the DB — Postgres is the external tradex-postgres
     # container, not a service in this compose project. Prisma retries the
     # connection on boot if the DB is briefly unreachable.
@@ -61,7 +72,7 @@ services:
     # `edge` = shared net to reach tradex-nginx (proxy) and tradex-postgres (DB).
     networks: [hiredesq, edge]
 
-  worker:
+  hiredesq-worker:
     build:
       context: ./release/worker
       dockerfile: ../../Dockerfile.worker
@@ -85,7 +96,7 @@ services:
     # reach tradex-postgres for both the data and the pg-boss queue.
     networks: [hiredesq, edge]
 
-  web:
+  hiredesq-web:
     build:
       context: ./release/web
       dockerfile: ../../Dockerfile.web
@@ -96,14 +107,14 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       # SSR fetches to /api/* are rewritten via this internal URL.
-      INTERNAL_API_URL: http://api:3001
+      INTERNAL_API_URL: http://hiredesq-api:3001
       # Public-facing API base used by client-side code. The shared nginx serves
       # the API under /api on the same origin (it strips the prefix before the api
       # container, which has no global prefix). NB: browser calls use the value
       # baked at build time (build.sh) — this runtime value only affects SSR.
       NEXT_PUBLIC_API_URL: ${APP_URL}/api
     depends_on:
-      - api
+      - hiredesq-api
     networks: [hiredesq, edge]
 
 # NOTE: no nginx / certbot here by design. TLS termination + reverse proxy is the

@@ -271,6 +271,82 @@ importers:
         specifier: ^5.6.0
         version: 5.9.3
 
+  release/api:
+    dependencies:
+      '@fastify/multipart':
+        specifier: ^8.3.0
+        version: 8.3.1
+      '@hiredesq/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
+      '@hiredesq/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@hiredesq/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@hiredesq/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@hiredesq/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
+      '@nestjs/common':
+        specifier: ^10.4.0
+        version: 10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^10.4.0
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-fastify':
+        specifier: ^10.4.0
+        version: 10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@10.4.22(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))
+      '@prisma/client':
+        specifier: 6.19.3
+        version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.1
+        version: 0.14.4
+      google-auth-library:
+        specifier: ^9.14.0
+        version: 9.15.1
+      otplib:
+        specifier: ^13.4.1
+        version: 13.4.1
+      pg-boss:
+        specifier: ^10.1.5
+        version: 10.4.2
+      qrcode:
+        specifier: ^1.5.4
+        version: 1.5.4
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      stripe:
+        specifier: ^17.0.0
+        version: 17.7.0
+    devDependencies:
+      '@nestjs/cli':
+        specifier: ^10.4.0
+        version: 10.4.9
+      '@types/node':
+        specifier: ^20.14.0
+        version: 20.19.43
+      '@types/qrcode':
+        specifier: ^1.5.6
+        version: 1.5.6
+      dotenv-cli:
+        specifier: ^8.0.0
+        version: 8.0.0
+      prisma:
+        specifier: 6.19.3
+        version: 6.19.3(typescript@5.9.3)
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+
 packages:
 
   '@alloc/quick-lru@5.2.0':

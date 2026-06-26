@@ -52,6 +52,22 @@ SELECT 'CREATE DATABASE "$HIREDESQ_DB" OWNER "$HIREDESQ_ROLE"'
 GRANT ALL PRIVILEGES ON DATABASE "$HIREDESQ_DB" TO "$HIREDESQ_ROLE";
 EOSQL
 
+# Pre-create extensions AS THE SUPERUSER, inside the hiredesq database.
+# WHY THIS STEP EXISTS (a deploy learning): the schema uses pgvector (`vector`)
+# and pg_trgm. `pg_trgm` is a TRUSTED extension (a non-superuser DB owner may
+# create it), but `vector` is NOT trusted — so the `hiredesq` role canNOT run
+# `CREATE EXTENSION vector` and `prisma migrate deploy` would die with
+# "permission denied to create extension vector". Creating both here as the
+# superuser makes the migrations' `CREATE EXTENSION IF NOT EXISTS` calls no-ops.
+# Idempotent. If the image lacks pgvector, this step fails loudly here (good —
+# better than a cryptic mid-migration error).
+echo "==> pre-creating extensions (pg_trgm, vector) in '$HIREDESQ_DB' as superuser"
+docker exec -i "$PG_CONTAINER" \
+  psql -v ON_ERROR_STOP=1 --username "$SUPERUSER" --dbname "$HIREDESQ_DB" <<'EOSQL'
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS vector;
+EOSQL
+
 echo "==> done. hiredesq can now connect as:"
 echo "    postgresql://$HIREDESQ_ROLE:****@tradex-postgres:5432/$HIREDESQ_DB?schema=public"
 echo "    (host = the container name 'tradex-postgres', reachable over the edge net)"
