@@ -42,6 +42,15 @@ What you check:
    list/search path — an unnecessary PII surface as well as a perf cost. Flag tenant
    PII reads that project no explicit `select`; decrypt contact fields only on the
    single-record/export paths.
+8. **Notification copy carries no PII.** A `Notification`'s `title`/`body`/`data` is
+   persisted *and* rendered client-side, so PII placed there leaks like an error
+   string (check 6). The copy is built by the shared `buildNotification`
+   (`packages/shared/src/notifications.ts`) — confirm each `case` and every
+   `NotificationParams` entry render **counts/ids and system text only**, never a
+   candidate name/email/phone or resume fragment. `NotificationData` is an open index
+   signature (it won't type-error a PII field), so the guarantee rests on review:
+   flag any param or interpolation that pipes a contact field into a notification, on
+   both the API `emit` and the worker `create` paths. (See `docs/notifications.md`.)
 
 Method: grep changed files for logging calls and inspect their arguments; grep for
 the AI request construction and check what's attached; cross-reference new PII

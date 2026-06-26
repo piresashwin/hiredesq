@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useGoogleLogin } from "@react-oauth/google";
 import { api, ApiError, isTwoFactorChallenge } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { detectTimezone } from "@/lib/timezone";
 import { Button } from "@/components/ui/Button";
 import { SpinnerIcon } from "@/components/ui/Icon";
 
@@ -63,7 +64,9 @@ export function GoogleSignInButton({
     flow: "auth-code",
     onSuccess: async ({ code }) => {
       try {
-        const session = await api.googleAuth(code);
+        // timezone seeds a brand-new Google account's timezone + country; the API
+        // ignores it for a returning account.
+        const session = await api.googleAuth(code, detectTimezone());
         if (isTwoFactorChallenge(session)) {
           setSubmitting(false);
           if (onTwoFactor) onTwoFactor(session.challengeToken);

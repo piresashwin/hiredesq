@@ -20,6 +20,7 @@ import { buildPage, pageSkip, pageTake } from "../../common/pagination.js";
 import { effectivePlacementStatus } from "../placements/guarantee.js";
 import { candidateListSelect, toCandidateDto, toCandidateListItemDto } from "./candidate.mapper.js";
 import type { AddNoteDto, UpdateCandidateDto } from "./candidates.dto.js";
+import { coerceCustomFieldValue } from "../custom-fields/custom-field.value.js";
 
 /** A buffered candidate photo handed over by the controller (multipart). */
 export interface IncomingPhoto {
@@ -383,10 +384,12 @@ export class CandidatesService {
   }
 
   async update(workspaceId: string, id: string, dto: UpdateCandidateDto): Promise<CandidateDto> {
-    // Confirm the candidate is in this workspace before touching it (§1).
+    // Confirm the candidate is in this workspace before touching it (§1). Pull the
+    // current custom-field map too so a partial value write merges rather than
+    // clobbers (only when the patch touches custom fields).
     const existing = await this.prisma.candidate.findFirst({
       where: { id, workspaceId },
-      select: { id: true },
+      select: { id: true, customFields: dto.customFields !== undefined },
     });
     if (!existing) throw new NotFoundException("candidate not found");
 
@@ -414,11 +417,52 @@ export class CandidatesService {
     if (dto.residenceTransferable !== undefined) data.residenceTransferable = dto.residenceTransferable;
     if (dto.licenses !== undefined) data.licenses = dto.licenses;
 
+    if (dto.customFields !== undefined) {
+      data.customFields = await this.mergeCustomFields(
+        workspaceId,
+        (existing.customFields as Record<string, string>) ?? {},
+        dto.customFields,
+      );
+    }
+
     // Scope the write by workspaceId too — updateMany so the predicate is part of
     // the WHERE, then re-read for the response.
     await this.prisma.candidate.updateMany({ where: { id, workspaceId }, data });
     this.logger.log(`update candidate ws=${workspaceId} id=${id}`); // ids only, no PII (§2)
     return this.getById(workspaceId, id);
+  }
+
+  /**
+   * Merge a custom-field value patch into the candidate's existing map. Each key is
+   * a CustomFieldDefinition id scoped to this workspace (§1) — unknown ids are
+   * rejected; a null value clears the field. Values are validated/normalized against
+   * their definition's type so stored data stays clean.
+   */
+  private async mergeCustomFields(
+    workspaceId: string,
+    current: Record<string, string>,
+    patch: Record<string, string | null>,
+  ): Promise<Record<string, string>> {
+    const ids = Object.keys(patch);
+    if (ids.length === 0) return current;
+
+    const defs = await this.prisma.customFieldDefinition.findMany({
+      where: { workspaceId, id: { in: ids } },
+      select: { id: true, label: true, type: true, options: true },
+    });
+    const byId = new Map(defs.map((d) => [d.id, d]));
+
+    const next: Record<string, string> = { ...current };
+    for (const [id, raw] of Object.entries(patch)) {
+      const def = byId.get(id);
+      if (!def) throw new BadRequestException("unknown custom field");
+      if (raw === null || raw.trim() === "") {
+        delete next[id];
+      } else {
+        next[id] = coerceCustomFieldValue(def, raw);
+      }
+    }
+    return next;
   }
 
   async remove(workspaceId: string, id: string): Promise<void> {

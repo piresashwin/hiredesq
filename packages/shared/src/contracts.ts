@@ -23,6 +23,12 @@ export interface SignupInput {
   fullName: string;
   /** First workspace created for the new user; they become its owner. */
   workspaceName: string;
+  /**
+   * Browser-detected IANA timezone (Intl.DateTimeFormat().resolvedOptions().timeZone,
+   * e.g. "Asia/Dubai"). Optional — used to seed the user's timezone preference and
+   * derive a default country at signup. Falls back to the schema defaults if absent.
+   */
+  timezone?: string;
 }
 
 export interface LoginInput {
@@ -38,6 +44,12 @@ export interface LoginInput {
  */
 export interface GoogleAuthInput {
   code: string;
+  /**
+   * Browser-detected IANA timezone (e.g. "Asia/Dubai"). Optional — only used on the
+   * find-or-CREATE path to seed a brand-new Google user's timezone + default country;
+   * ignored for a returning account. See SignupInput.timezone.
+   */
+  timezone?: string;
 }
 
 export interface AuthTokens {
@@ -70,6 +82,12 @@ export interface AuthUserDto {
   theme: ThemePreference;
   /** IANA timezone for displaying dates/times (e.g. "Asia/Dubai"). User-level preference. */
   timezone: string;
+  /**
+   * ISO 3166-1 alpha-2 country code (e.g. "AE"), auto-detected from the timezone at
+   * signup. A best-effort display/locale default the user can correct; null when never
+   * detected or for a region-less timezone.
+   */
+  country: string | null;
   /** Preferred/default currency code (ISO 4217, e.g. "USD") for new jobs/placements. */
   currency: string;
   /** Whether TOTP two-factor auth is enabled — login is gated on a code when true. */
@@ -99,6 +117,8 @@ export interface UpdateProfileInput {
   theme?: ThemePreference;
   /** IANA timezone (e.g. "Asia/Dubai"). */
   timezone?: string;
+  /** ISO 3166-1 alpha-2 country code (e.g. "AE"). Empty string clears it. */
+  country?: string | null;
   /** ISO 4217 currency code (e.g. "USD"). */
   currency?: string;
   /** Mark one or more screens' tours as seen; merged server-side, never replaces. */
@@ -174,6 +194,26 @@ export interface ResetPasswordInput {
   newPassword: string;
 }
 
+// ─────────────────────── Passwordless (magic-link) login ───────────────────────
+
+/**
+ * Request a one-time login link for an existing account — always 204 (never reveals
+ * whether the email exists, like forgot-password). The emailed link carries a token
+ * the client redeems at /auth/magic-link/verify.
+ */
+export interface RequestMagicLinkInput {
+  email: string;
+}
+
+/**
+ * Redeem a magic-link token. Resolves to a normal login outcome (LoginResultDto):
+ * tokens outright, OR — when the account has 2FA enabled — a challenge to complete
+ * at /auth/login/2fa, exactly like password/Google login.
+ */
+export interface VerifyMagicLinkInput {
+  token: string;
+}
+
 // ─────────────────────────── Candidates (§2) ───────────────────────────
 
 /**
@@ -198,6 +238,12 @@ export interface CandidateDto {
   licenses: string[];
   /** Short-lived signed URL for the candidate's profile photo, or null if none (§2). */
   photoUrl: string | null;
+  /**
+   * Values for the workspace's custom fields — a map of CustomFieldDefinition.id ->
+   * stringified value (boolean "true"/"false", date ISO yyyy-mm-dd, the rest as
+   * text). Only ids with a live definition appear; render against listCustomFields.
+   */
+  customFields: Record<string, string>;
   source: string;
   createdAt: string;
   updatedAt: string;
@@ -270,6 +316,42 @@ export interface UpdateCandidateInput {
   nationality?: string | null;
   residenceTransferable?: boolean | null;
   licenses?: string[];
+  /**
+   * Custom-field values to set, keyed by CustomFieldDefinition.id. Merged into the
+   * candidate's existing values; a null value clears that field. Unknown ids (no
+   * matching workspace definition) are rejected.
+   */
+  customFields?: Record<string, string | null>;
+}
+
+// ─────────────────────────── Custom fields (workspace-configurable) ───────────────────────────
+
+/** The set of custom-field value types a workspace can configure. */
+export type CustomFieldType = "text" | "number" | "date" | "select" | "boolean";
+
+/** A workspace-configured custom candidate field (Settings → Candidate fields). */
+export interface CustomFieldDefinitionDto {
+  id: string;
+  label: string;
+  type: CustomFieldType;
+  /** Choices for a `select` field; empty for every other type. */
+  options: string[];
+  /** Ascending display order on the candidate's Personal-details tab. */
+  order: number;
+}
+
+/** Create a custom field. `options` is required (non-empty) only for `select`. */
+export interface CreateCustomFieldInput {
+  label: string;
+  type: CustomFieldType;
+  options?: string[];
+}
+
+/** Update a custom field's label, `select` options, or display order. Type is immutable. */
+export interface UpdateCustomFieldInput {
+  label?: string;
+  options?: string[];
+  order?: number;
 }
 
 /** Per-candidate export payload (GDPR / DPDP — CLAUDE.md §2). */
@@ -764,6 +846,58 @@ export interface HomeOverviewDto {
   awaitingVerdict: { count: number; items: HomeAttentionItemDto[] };
   /** Name-only duplicate matches awaiting a merge/keep decision (§5). */
   duplicatesPending: number;
+}
+
+// ─────────────────────────── Notifications (Phase 0) ───────────────────────────
+
+/**
+ * The kinds of in-app notification the platform can emit. A string union (not an
+ * enum) so a new trigger is a one-line addition both sides recompile against.
+ * Phase 1 ships the first: a bulk upload finishing.
+ */
+export type NotificationType = "bulk_import_complete";
+
+/**
+ * The structured payload stored on a notification. `link` is the in-app path the UI
+ * navigates to when the row is clicked; the rest is type-specific context (ids/counts
+ * only — never PII, §2). Open-ended so each type can carry its own fields.
+ */
+export interface NotificationData {
+  /** In-app path to open when the notification is clicked (e.g. "/candidates?batch=…"). */
+  link?: string;
+  [key: string]: string | number | boolean | null | undefined;
+}
+
+/**
+ * One in-app notification as returned by the API. `data` is a structured payload
+ * (ids/counts + a `link` target for the UI to navigate to) — never PII (§2).
+ * `readAt` is null until the recipient marks it read.
+ */
+export interface NotificationDto {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  /** Structured payload + link target; shape depends on `type`. Null when none. */
+  data: NotificationData | null;
+  /** ISO timestamp the recipient read it, or null if still unread. */
+  readAt: string | null;
+  createdAt: string;
+}
+
+/**
+ * Query params for the notifications list. `unreadOnly` narrows to still-unread rows
+ * (the bell dropdown's default view); pagination via the shared PageQueryInput fields.
+ * workspaceId is route-param derived, never in the query (§1).
+ */
+export interface ListNotificationsInput extends PageQueryInput {
+  /** When true, return only notifications the recipient hasn't read yet. */
+  unreadOnly?: boolean;
+}
+
+/** Unread badge count — just the number, never PII DTOs to render a badge (§2). */
+export interface NotificationUnreadCountDto {
+  count: number;
 }
 
 // ── Pagination (offset paging) ──────────────────────────────────────────────

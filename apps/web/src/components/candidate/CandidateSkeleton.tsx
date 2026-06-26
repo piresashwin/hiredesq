@@ -2,12 +2,12 @@
 // skeleton matching the final shape, never a centered spinner on a blank page).
 
 function Bar({ w }: { w: string }) {
-  return <div className={`h-3 rounded bg-subtle ${w}`} />;
+  return <div className={`h-3 rounded bg-subtle motion-safe:shimmer ${w}`} />;
 }
 
 export function CandidateSkeleton({ rows = 8 }: { rows?: number }) {
   return (
-    <div className="motion-safe:animate-pulse" aria-hidden>
+    <div aria-hidden>
       {/* Desktop rows */}
       <div className="hidden sm:block">
         {Array.from({ length: rows }).map((_, i) => (

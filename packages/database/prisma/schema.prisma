@@ -130,6 +130,7 @@ model Workspace {
   submissions          Submission[]
   qualificationTrail   QualificationTrailEntry[]
   notes                Note[]
+  notifications        Notification[]
   upgradeInterest      UpgradeInterest?
   customFieldDefs      CustomFieldDefinition[]
 
@@ -192,6 +193,10 @@ model User {
   // These are display/prefill defaults — the authoritative money currency stays on
   // each Job/Placement row (CLAUDE.md §3).
   timezone     String   @default("UTC")
+  // ISO 3166-1 alpha-2 country code (e.g. "AE"), auto-detected from the browser
+  // timezone at signup. A best-effort display/locale default the user can correct;
+  // null when undetected or for a region-less timezone (e.g. UTC).
+  country      String?
   currency     String   @default("USD")
   // Two-factor auth (TOTP). The shared secret is stored ENCRYPTED at rest
   // (encryptField, §2/§6) and is only set once enrollment starts; `twoFactorEnabled`
@@ -206,6 +211,12 @@ model User {
   // token (never the token itself, §6) plus its expiry; both cleared on use.
   passwordResetTokenHash String?   @map("password_reset_token_hash")
   passwordResetExpiresAt DateTime? @map("password_reset_expires_at")
+  // Passwordless login (magic-link). Same shape as the reset token above: only the
+  // HASH of the emailed token is stored (never the token, §6) plus a short expiry;
+  // both are cleared atomically the moment the link is claimed, so a link is
+  // single-use. Shorter-lived than a reset link (15 min) — it mints a session.
+  loginTokenHash         String?   @map("login_token_hash")
+  loginTokenExpiresAt    DateTime? @map("login_token_expires_at")
   // First-run onboarding: when the user finished (or skipped) the welcome
   // takeover. Null = never seen it, so the web app shows the onboarding carousel
   // once per account. Set once, idempotently (never re-shown after).
@@ -535,6 +546,11 @@ model ImportBatch {
   // Job-centric inbound (§2A, F7): the open position this drop was aimed at, so its
   // candidates land attached to the req. Null = the global pool. SetNull on job delete.
   jobId       String?           @map("job_id")
+  // The Anthropic Message Batch id for the bulk drop's AI items, persisted right
+  // after submit. On a coordinator retry (pg-boss / poll timeout) this lets the job
+  // RECONNECT to the live provider batch and settle it, instead of submitting a
+  // second batch for the same resumes (which strands the first + re-pays, §5).
+  providerBatchId String?        @map("provider_batch_id")
   createdAt   DateTime          @default(now()) @map("created_at")
   updatedAt   DateTime          @updatedAt @map("updated_at")
 
@@ -626,4 +642,38 @@ model QualificationTrailEntry {
 
   @@index([workspaceId, applicationId])
   @@map("qualification_trail_entry")
+}
+
+// ─────────────────────────── Notifications (Phase 0) ───────────────────────────
+
+// A reusable in-app notification primitive every module can emit into. Tenant-scoped
+// (§1) — every read/write filters by workspaceId. `userId` is nullable: v1 fans a
+// notification to the whole workspace (null = workspace-level), seat-targeting is
+// the later use of the column. `type` is a NotificationType string; `title`/`body`
+// are pre-rendered display copy (built by the shared buildNotification helper so the
+// API and worker produce the identical shape). `data` carries the link target +
+// structured payload (ids/counts only — never PII, §2).
+model Notification {
+  id          String    @id @default(cuid())
+  workspaceId String    @map("workspace_id")
+  // Null = workspace-level (fanned to every member); set = targeted at one seat.
+  userId      String?   @map("user_id")
+  type        String
+  title       String
+  body        String
+  // Structured payload + link target (ids/counts only, never PII — §2). Null when
+  // the type carries no extra data.
+  data        Json?
+  // Null until the recipient marks it read; set = read at this time.
+  readAt      DateTime? @map("read_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  // The unread-feed/count query (workspace + recipient scope, all-equality on
+  // readAt — a clean index seek) and the recency-ordered dropdown list (the
+  // default feed: workspace + recipient scope ordered by createdAt).
+  @@index([workspaceId, userId, readAt])
+  @@index([workspaceId, userId, createdAt])
+  @@map("notification")
 }

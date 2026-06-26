@@ -19,6 +19,16 @@ truth for tokens, principles, and the base components. The full reference is
   never raw hex.
 - **Reuse the base components in `src/components/ui/`** (`Button`, `StageBadge`/
   `AiBadge`/`Chip`, `Money`/`Stat`, `PageHeader`). Extend that layer; don't re-roll primitives.
+- **Behaviour primitives come from Radix (+ cmdk), styling is ours.** Dialogs,
+  menus, popovers, tooltips, focus traps, dismissable layers → **Radix**
+  (`@radix-ui/react-*`), wrapped behind the `ui/` component and skinned with tokens
+  (we own the source — no shadcn CLI / `cva` / `tailwind-merge`). Command palette and
+  any typeahead/combobox → **`cmdk`** (Radix has none). **Never hand-roll a dialog,
+  menu, focus trap, or popover.** Every overlay is already migrated: `Modal`/`SlideOver`/
+  `OnboardingCarousel` on Radix `Dialog`, `Menu`/`ProfileMenu` on Radix `DropdownMenu`,
+  `NotificationBell` on Radix `Popover`, `Spotlight` on `cmdk` — the old `useFocusTrap`
+  hook is retired, don't reintroduce one. Icons: add to the local
+  [Icon.tsx](../../apps/web/src/components/ui/Icon.tsx) set — no icon-library dep.
 - **Every top-level screen uses `PageHeader`** (design-system.md §5), which holds
   **only**: title (`text-h1`, required) + one-line subtitle (`text-sm text-muted`,
   required) + **at most one** primary action top-right (omit on pages with no create
@@ -28,6 +38,16 @@ truth for tokens, principles, and the base components. The full reference is
   search-mode toggle is icon+label for both modes (`⌨ Keyword` ⇄ `✦ Semantic`). The
   test: names the page or is its single top action → header; data + controls that
   filter/search/sort it → body.
+- **Spacing is "breezy frame, dense data" (design-system.md §5).** The *frame*
+  breathes; the *data* stays tight. Breathe: page gutter `px-4 sm:px-6 lg:px-8`,
+  page vertical `py-6 sm:py-8`, section gap `space-y-8`, card-grid `gap-4 lg:gap-5`,
+  card padding `p-5` (hero/glance tiles `p-6 lg:p-7`), `PageHeader` `py-4`
+  (title→subtitle `mt-1`), sidebar `py-5`, dropzone `py-10 sm:py-12`, empty/first-run
+  `p-10 sm:p-12`. Keep dense — never loosen: table/list rows (40px, 48px revenue),
+  chips/badges (`px-1.5 py-0.5`), kanban *cards* (`p-2.5`), inline icon+text gaps in a
+  row (kanban *column* gaps are frame, so they may grow). Rule of thumb: card padding
+  ≥ the gap between cards. Own the rhythm in the shared `PageHeader`/`PageBody`/`Section`
+  primitives — don't re-type raw spacing per page.
 - **Run every screen past "Priya"**, the recruiter persona in the design doc:
   faster than her spreadsheet, nothing to learn, money one click away.
 

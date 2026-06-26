@@ -120,6 +120,18 @@ Flow: enqueue the folder → create one batch with one request per resume (same
 schema/prompt) → poll for completion → ingest each result through validate → dedup
 → store. Reserve credits up front for the batch; refund the ones that error.
 
+**Retry-safe coordinator (CLAUDE.md §5).** The coordinator pg-boss job runs under
+`retryLimit:3`, so a batch-level throw (Anthropic submit failure, the 24h poll
+timeout, or a worker restart) re-runs the whole job. Two durable anchors keep that
+idempotent — never re-submitting, re-paying, or double-counting:
+- **`ImportBatch.providerBatchId`** — the Anthropic Message Batch id, persisted right
+  *after* submit and *before* polling. On retry the coordinator **reconnects** to that
+  live batch and settles it instead of submitting a second batch for the same resumes.
+- **`ParseJob.status`** — items already `done`/`failed` are skipped; the
+  submitted-but-unsettled set is exactly those left `processing`. Per-item failures
+  release the reserved ingest slot from durable DB state (`failParseAndReleaseSlot`),
+  so a slot is freed exactly once across retries and never leaks.
+
 Use live single-call parsing for the **interactive** moment (one paste, instant
 result — the activation metric); use the Batch API for **bulk backfill**.
 

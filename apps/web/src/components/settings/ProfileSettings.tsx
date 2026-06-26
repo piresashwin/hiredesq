@@ -37,10 +37,24 @@ const CURRENCIES: SelectOption[] = [
   { value: "GBP", label: "GBP — British Pound" },
   { value: "AED", label: "AED — UAE Dirham" },
   { value: "SAR", label: "SAR — Saudi Riyal" },
+  { value: "QAR", label: "QAR — Qatari Riyal" },
+  { value: "KWD", label: "KWD — Kuwaiti Dinar" },
+  { value: "BHD", label: "BHD — Bahraini Dinar" },
+  { value: "OMR", label: "OMR — Omani Rial" },
   { value: "INR", label: "INR — Indian Rupee" },
   { value: "AUD", label: "AUD — Australian Dollar" },
   { value: "CAD", label: "CAD — Canadian Dollar" },
   { value: "SGD", label: "SGD — Singapore Dollar" },
+  { value: "JPY", label: "JPY — Japanese Yen" },
+  { value: "CNY", label: "CNY — Chinese Yuan" },
+  { value: "HKD", label: "HKD — Hong Kong Dollar" },
+  { value: "KRW", label: "KRW — South Korean Won" },
+  { value: "MYR", label: "MYR — Malaysian Ringgit" },
+  { value: "THB", label: "THB — Thai Baht" },
+  { value: "IDR", label: "IDR — Indonesian Rupiah" },
+  { value: "PHP", label: "PHP — Philippine Peso" },
+  { value: "VND", label: "VND — Vietnamese Dong" },
+  { value: "PKR", label: "PKR — Pakistani Rupee" },
 ];
 
 // The browser's full IANA timezone list when available, with a small fallback for
@@ -66,11 +80,11 @@ export function ProfileSettings() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-line bg-canvas/95 px-4 py-3 backdrop-blur sm:px-6">
+      <div className="border-b border-line bg-canvas/95 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
         <h1 className="text-h1 text-ink">Profile settings</h1>
         <p className="mt-0.5 text-sm text-muted">Your photo, name, security, and preferences.</p>
       </div>
-      <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-5 sm:px-6">
+      <div className="mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
           <IdentityPanel />
           <Tabs variant="pill" tabs={TABS} value={tab} onChange={(k) => setTab(k as TabKey)}>
@@ -240,7 +254,7 @@ function ProfileTab() {
 
 function SecurityTab() {
   return (
-    <div aria-label="Security" className="space-y-6">
+    <div aria-label="Security" className="space-y-8">
       <ChangePassword />
       <hr className="border-line" />
       <TwoFactorRow />
@@ -655,7 +669,7 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
 
 function PreferencesTab() {
   return (
-    <div aria-label="Preferences" className="space-y-6">
+    <div aria-label="Preferences" className="space-y-8">
       <Appearance />
       <hr className="border-line" />
       <RegionPreferences />

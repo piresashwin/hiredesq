@@ -1,9 +1,10 @@
 import type { SVGProps } from "react";
 
-// Local inline icon set (no lucide / icon dependency — see task constraints).
-// 1.5px stroke, currentColor, 20px default to match the design-system spec
-// (§6.9). Decorative by default (aria-hidden); pass aria-label to make one
-// meaningful to assistive tech.
+// Local inline icon set — the design-system canon is ONE local set with NO
+// icon-library dependency (don't add lucide/etc; add a new glyph here). 1.5px
+// stroke, currentColor, 20px default to match the design-system spec (§6.9).
+// Decorative by default (aria-hidden); pass aria-label to make one meaningful to
+// assistive tech.
 
 type IconProps = SVGProps<SVGSVGElement> & { title?: string };
 
@@ -271,5 +272,13 @@ export const PrinterIcon = (p: IconProps) => (
     <path d="M6 9V2h12v7" />
     <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
     <rect x="6" y="14" width="12" height="8" rx="1" />
+  </Base>
+);
+
+/** A bell — the in-app notifications affordance in the header. */
+export const BellIcon = (p: IconProps) => (
+  <Base {...p}>
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
   </Base>
 );

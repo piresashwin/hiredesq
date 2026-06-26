@@ -119,14 +119,14 @@ export function BillingPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-line bg-canvas/95 px-4 py-3 backdrop-blur sm:px-6">
+      <div className="border-b border-line bg-canvas/95 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
         <h1 className="text-h1 text-ink">Credits & plan</h1>
         <p className="mt-0.5 text-sm text-muted">
           Your daily credits power client-ready submissions. Resume parsing is free.
         </p>
       </div>
 
-      <div className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-5 sm:px-6">
+      <div className="mx-auto w-full max-w-3xl flex-1 space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {loading ? (
           <BillingSkeleton />
         ) : error || !credits ? (
@@ -249,7 +249,7 @@ function BillingContent({
       </section>
 
       {/* Free-forever reassurance (never a paywall on core) */}
-      <section className="rounded-lg border border-line bg-brand-tint/40 p-4">
+      <section className="rounded-lg border border-line bg-brand-tint/40 p-5">
         <p className="text-body text-ink">
           <span className="font-semibold">Free forever:</span> your database, search, jobs, and
           revenue — plus resume parsing. Daily credits only ever limit how many client-ready
@@ -258,7 +258,7 @@ function BillingContent({
       </section>
 
       {/* Free vs Team comparison */}
-      <section aria-label="Plan comparison" className="grid gap-3 md:grid-cols-2">
+      <section aria-label="Plan comparison" className="grid gap-4 md:grid-cols-2 lg:gap-5">
         <PlanCard
           name="Free"
           tagline="For a solo desk getting started."
@@ -350,7 +350,7 @@ function PlanCard({
   return (
     <div
       className={cn(
-        "flex flex-col rounded-lg border bg-surface p-5",
+        "flex flex-col rounded-lg border bg-surface p-6",
         highlight ? "border-brand/50 shadow-sm" : "border-line",
       )}
     >
@@ -397,8 +397,8 @@ function BillingSkeleton() {
         <div className="mt-4 h-2.5 w-full rounded-sm bg-subtle" />
         <div className="mt-2 h-3 w-48 rounded-sm bg-subtle" />
       </div>
-      <div className="mt-6 h-16 rounded-lg border border-line bg-subtle/60" />
-      <div className="mt-6 grid gap-3 md:grid-cols-2">
+      <div className="mt-8 h-16 rounded-lg border border-line bg-subtle/60" />
+      <div className="mt-8 grid gap-4 md:grid-cols-2 lg:gap-5">
         <div className="h-64 rounded-lg border border-line bg-surface" />
         <div className="h-64 rounded-lg border border-line bg-surface" />
       </div>

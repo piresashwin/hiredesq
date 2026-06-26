@@ -39,6 +39,14 @@ its invariants are non-negotiable.
    candidate-identity domain service), not in NestJS services. Services orchestrate
    + persist; `core` owns the invariants. Everything else stays plain CRUD
    (`CLAUDE.md` → Architecture).
+8. **Notifications** — to alert the recruiter, emit into the existing cross-cutting
+   primitive; don't build an ad-hoc table or event bus. API: inject
+   `NotificationsService` and call `emit(workspaceId, { type, params })`. Worker:
+   call the shared pure `buildNotification` + `prisma.notification.create` (same
+   shape), **inside the exactly-once state transition** the trigger keys off so it
+   can't double-fire. A new alert kind = a new `NotificationType` + `params` entry +
+   a `buildNotification` case (the exhaustive `switch` forces it). Copy is
+   counts/ids only — never PII (§2). See `docs/notifications.md`.
 
 ## Web/frontend pitfalls (learned the hard way here)
 - **Request bodies are typed by ONE shared contract — never a local mirror.** Every
@@ -79,6 +87,12 @@ its invariants are non-negotiable.
   passed in; on a clickable/`<Link>` row, wrap the menu cell with `stopPropagation`/
   `preventDefault` so opening the menu never triggers the row. Wire each item ONLY to an
   existing endpoint — omit an action rather than invent backend behavior.
+- **Overlays/menus/typeahead use the primitive layer, not hand-rolled a11y.**
+  Behaviour (focus trap, Esc, scroll-lock, dismissable layers) comes from **Radix**
+  (`@radix-ui/react-*`) wrapped behind `components/ui/` and styled with tokens; the
+  command palette + any combobox/typeahead use **`cmdk`** (Radix has none). `Modal`/
+  `SlideOver`/`Menu` already run on Radix and `Spotlight` on `cmdk`. Don't hand-roll a
+  dialog/menu/focus trap for a new feature — reach for the primitive. (design-system.md §6.)
 - **No side effects in a render body.** Network calls and `setState` live in
   `useEffect` or event handlers, never in the component body or a child render fn
   (it re-fires every render). `react-hooks` lint won't catch a bare call — watch for
@@ -93,6 +107,12 @@ its invariants are non-negotiable.
   hand-roll a header band: it holds ONLY title + one-line subtitle (both required) +
   at most one primary action. The page search box / filters / mode toggles / counts
   go in the BODY as a toolbar leading the content — never in the header (design-system.md §5).
+- **Spacing follows "breezy frame, dense data" (design-system.md §5)** — the frame
+  breathes (gutters, section gaps, card padding, headers), the data stays dense (40px
+  table rows, chips, kanban cards never loosen). Compose the shared
+  `PageHeader`/`PageBody`/`Section` primitives for the page rhythm rather than typing
+  raw `px-*`/`py-*`/`space-y-*` per page; hand finer visual/styling detail to the
+  `tailwind-developer` agent.
 
 ## Scope discipline
 Make the change requested; don't add speculative abstractions, features, or error

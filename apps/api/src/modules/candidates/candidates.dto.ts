@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsBooleanString,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   MaxLength,
@@ -78,6 +79,13 @@ export class UpdateCandidateDto implements UpdateCandidateInput {
   @IsArray()
   @IsString({ each: true })
   licenses?: string[];
+
+  // Custom-field values keyed by CustomFieldDefinition.id. Each value is a string
+  // (set) or null (clear). Shape + per-value validation against the workspace's
+  // definitions happens in the service; here we only confirm it's an object.
+  @IsOptional()
+  @IsObject()
+  customFields?: Record<string, string | null>;
 }
 
 // A free-form recruiter note on a candidate. No workspaceId/candidateId fields —

@@ -25,4 +25,6 @@ export {
   MailService,
   type MailSendResult,
   type PasswordResetEmail,
+  type MagicLinkEmail,
+  type WelcomeEmail,
 } from "./mail/index.js";

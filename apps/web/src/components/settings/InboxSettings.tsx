@@ -44,14 +44,14 @@ export function InboxSettings() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-line bg-canvas/95 px-4 py-3 backdrop-blur sm:px-6">
+      <div className="border-b border-line bg-canvas/95 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
         <h1 className="text-h1 text-ink">Forwarding inbox</h1>
         <p className="mt-0.5 text-sm text-muted">
           Forward a CV to your workspace and it lands parsed in your pool.
         </p>
       </div>
 
-      <div className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-5 sm:px-6">
+      <div className="mx-auto w-full max-w-3xl flex-1 space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {loading ? (
           <InboxSkeleton />
         ) : error || !inbox ? (
@@ -221,7 +221,7 @@ function InboxSkeleton() {
         <div className="mt-1.5 h-3 w-2/3 rounded-sm bg-subtle" />
         <div className="mt-4 h-10 w-full rounded-sm bg-subtle" />
       </div>
-      <div className="mt-6 h-32 rounded-lg border border-line bg-surface" />
+      <div className="mt-8 h-32 rounded-lg border border-line bg-surface" />
     </div>
   );
 }

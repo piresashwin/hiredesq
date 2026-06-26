@@ -145,3 +145,9 @@ export interface ParseJobData {
 
 // API request/response contracts (shared with the web app).
 export * from "./contracts.js";
+
+// Pure notification copy/payload builder (shared by api + worker).
+export * from "./notifications.js";
+
+// Timezone → country resolution for signup defaults.
+export * from "./geo.js";

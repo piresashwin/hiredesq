@@ -68,6 +68,16 @@ Sequencing is in §7. Both tiers are still pre-§3 (the deferred/non-goal line) 
 - **[v1.1]** Free tier with **credit metering** on AI *generation* actions (see §4).
 - **[v1.1]** Stripe (or regional equivalent) for the paid upgrade.
 
+### G. System notifications (cross-cutting) — [v1.1]
+- A workspace-scoped **in-app notification center** (bell + feed), shipped as a
+  reusable primitive every module emits into — not a per-feature bolt-on. **In-app
+  only** for v1 (no email/push; revisit when the team tier justifies channels).
+- Triggers tie to existing surfaces, not new value: **bulk-import complete** (the
+  §2A "200 resumes" payoff), **at-risk placement nearing the guarantee window**
+  (§2E money honesty), and a **low-balance / cap-hit nudge** (§4 upgrade intent —
+  *not* "credits expiring": daily credits don't accrue, so nothing expires).
+- Notifications never carry PII (§2) — counts/ids and system copy only.
+
 ---
 
 ## 3. Scope boundaries — protect the wedge

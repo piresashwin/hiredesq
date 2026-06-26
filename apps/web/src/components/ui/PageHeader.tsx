@@ -26,7 +26,7 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "border-b border-line bg-canvas/95 px-4 py-3 backdrop-blur sm:px-6",
+        "border-b border-line bg-canvas/95 px-4 py-4 backdrop-blur sm:px-6 lg:px-8",
         sticky && "sticky top-14 z-20",
         className,
       )}
@@ -34,7 +34,7 @@ export function PageHeader({
       <div className="mx-auto flex w-full max-w-screen-2xl items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-h1 text-ink">{title}</h1>
-          <p className="mt-0.5 text-sm text-muted">{subtitle}</p>
+          <p className="mt-1 text-sm text-muted">{subtitle}</p>
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>

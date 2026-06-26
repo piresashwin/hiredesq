@@ -71,6 +71,14 @@ What you check:
     fragments. Require a single `toSafeParseErrorCode(err)` at every failure-status
     write; the raw `err.name`/stack may be logged server-side only. (Cross-ref the
     `pii-privacy-auditor`.)
+14. **Batch-complete notification fires exactly once.** `bumpBatch` emits the
+    `bulk_import_complete` notification (via the shared `buildNotification` +
+    `tx.notification.create`) **inside the same transaction as the `processing →
+    done` flip, guarded so only the winning `updateMany` (flipped.count > 0)
+    emits** — so it fires once per batch, not once per item. Flag a notification
+    `create` outside that guarded transition, or one keyed on per-item completion
+    (double-emits). The copy must be counts/ids only — never a candidate name (§2;
+    cross-ref `pii-privacy-auditor`). See `docs/notifications.md`.
 
 Method: read the parse worker and `packages/ai`; trace one parse end-to-end (gate →
 route → model call → validate → dedup → insert → settle). Confirm the model id

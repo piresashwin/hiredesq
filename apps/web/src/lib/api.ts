@@ -17,7 +17,9 @@ import type {
   ForgotPasswordInput,
   GoogleAuthInput,
   LoginResultDto,
+  RequestMagicLinkInput,
   ResetPasswordInput,
+  VerifyMagicLinkInput,
   ThemePreference,
   TwoFactorChallengeDto,
   TwoFactorLoginInput,
@@ -64,6 +66,12 @@ import type {
   UpdateCandidateInput,
   UpdateJobInput,
   UpgradeInterestInput,
+  CustomFieldDefinitionDto,
+  CreateCustomFieldInput,
+  UpdateCustomFieldInput,
+  ListNotificationsInput,
+  NotificationDto,
+  NotificationUnreadCountDto,
 } from "@hiredesq/shared";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -290,10 +298,10 @@ export const api = {
   // the caller branches on `twoFactorRequired`.
   login: (input: LoginInput) =>
     request<LoginResultDto>("/auth/login", { method: "POST", body: input, auth: false }),
-  googleAuth: (code: string) =>
+  googleAuth: (code: string, timezone?: string) =>
     request<LoginResultDto>("/auth/google", {
       method: "POST",
-      body: { code } satisfies GoogleAuthInput,
+      body: { code, timezone } satisfies GoogleAuthInput,
       auth: false,
     }),
   // Completes a 2FA-gated login with the challenge token + TOTP code.
@@ -332,6 +340,13 @@ export const api = {
     request<void>("/auth/forgot-password", { method: "POST", body: input, auth: false }),
   resetPassword: (input: ResetPasswordInput) =>
     request<void>("/auth/reset-password", { method: "POST", body: input, auth: false }),
+  // Passwordless login. request always resolves (204 whether or not the email
+  // exists — no enumeration); verify resolves to tokens OR a 2FA challenge
+  // (LoginResultDto), redeemed from the emailed link's ?token=.
+  requestMagicLink: (input: RequestMagicLinkInput) =>
+    request<void>("/auth/magic-link/request", { method: "POST", body: input, auth: false }),
+  verifyMagicLink: (input: VerifyMagicLinkInput) =>
+    request<LoginResultDto>("/auth/magic-link/verify", { method: "POST", body: input, auth: false }),
 
   // Candidates (workspace-scoped). `semantic` switches the backend from the
   // default keyword/fuzzy (typo-tolerant) search to meaning-based vector search
@@ -418,6 +433,24 @@ export const api = {
   // this never crosses a tenant boundary.
   getCandidateFileUrl: (id: string) =>
     request<SignedUrlDto>(workspacePath(`/candidates/${id}/file`)),
+
+  // Workspace-configurable custom candidate fields (Settings → Candidate fields).
+  // Listing is readable by any member (needed to render a profile); creating/
+  // editing/deleting is owner-only, enforced server-side (CLAUDE.md §1).
+  listCustomFields: () =>
+    request<CustomFieldDefinitionDto[]>(workspacePath("/custom-fields")),
+  createCustomField: (input: CreateCustomFieldInput) =>
+    request<CustomFieldDefinitionDto>(workspacePath("/custom-fields"), {
+      method: "POST",
+      body: input,
+    }),
+  updateCustomField: (id: string, input: UpdateCustomFieldInput) =>
+    request<CustomFieldDefinitionDto>(workspacePath(`/custom-fields/${id}`), {
+      method: "PATCH",
+      body: input,
+    }),
+  deleteCustomField: (id: string) =>
+    request<void>(workspacePath(`/custom-fields/${id}`), { method: "DELETE" }),
 
   // Jobs & pipeline (workspace-scoped). Routes carry IDs only; candidate names
   // live in response bodies, never in the URL (CLAUDE.md §2). Pipeline value +
@@ -588,4 +621,28 @@ export const api = {
   // Stripe customer — i.e. after a checkout). For managing an active Team sub.
   openBillingPortal: () =>
     request<BillingRedirectDto>(workspacePath("/billing/portal"), { method: "POST" }),
+
+  // Notifications (Phase 0/1). Workspace-scoped in-app feed for the header bell.
+  // The badge polls unread-count (just the number — never PII DTOs, §2); the
+  // dropdown lists recent rows and marks-read on click. workspaceId is route-param
+  // derived (CLAUDE.md §1). `params` is the shared ListNotificationsInput so a
+  // renamed field is a compile error on both sides.
+  listNotifications: (params: ListNotificationsInput = {}) => {
+    const q = new URLSearchParams();
+    if (params.page !== undefined) q.set("page", String(params.page));
+    if (params.limit !== undefined) q.set("limit", String(params.limit));
+    if (params.unreadOnly) q.set("unreadOnly", "true");
+    const qs = q.toString();
+    return request<Paginated<NotificationDto>>(
+      workspacePath(`/notifications${qs ? `?${qs}` : ""}`),
+    );
+  },
+  notificationUnreadCount: () =>
+    request<NotificationUnreadCountDto>(workspacePath("/notifications/unread-count")),
+  markNotificationRead: (id: string) =>
+    request<NotificationDto>(workspacePath(`/notifications/${id}/read`), { method: "POST" }),
+  markAllNotificationsRead: () =>
+    request<NotificationUnreadCountDto>(workspacePath("/notifications/read-all"), {
+      method: "POST",
+    }),
 };

@@ -86,6 +86,7 @@ export async function toCandidateDto(
     photoUrl,
     experience: (row.experience as unknown as ExperienceEntry[]) ?? [],
     education: (row.education as unknown as EducationEntry[]) ?? [],
+    customFields: (row.customFields as Record<string, string>) ?? {},
     source: row.source,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

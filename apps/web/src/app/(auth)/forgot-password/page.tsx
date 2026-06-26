@@ -6,6 +6,16 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { SpinnerIcon, CheckIcon } from "@/components/ui/Icon";
+import { AuthSplit } from "@/components/auth/AuthSplit";
+
+// The recovery flow shares the login/signup split box; this is its illustration.
+const ASIDE = {
+  image: "/onboarding/03-search.webp",
+  alt: "A plain-English search over a grid of clean candidate cards",
+  eyebrow: "Account recovery",
+  headline: "Let's get you back to your desk.",
+  sub: "Reset your password and pick up right where you left off — your candidate pool is waiting.",
+} as const;
 
 // Forgot-password request. We always show the same confirmation whether or not
 // the email exists (the API returns 204 either way — no account enumeration).
@@ -29,8 +39,8 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <div className="rounded-lg border border-line bg-surface p-6 text-center shadow-sm">
-        <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-success-tint text-money">
+      <AuthSplit aside={ASIDE}>
+        <span className="mt-8 flex h-10 w-10 items-center justify-center rounded-full bg-success-tint text-money">
           <CheckIcon className="h-5 w-5" strokeWidth={2.5} />
         </span>
         <h1 className="mt-3 text-h2 text-ink">Check your email</h1>
@@ -44,13 +54,13 @@ export default function ForgotPasswordPage() {
         >
           Back to sign in
         </Link>
-      </div>
+      </AuthSplit>
     );
   }
 
   return (
-    <div className="rounded-lg border border-line bg-surface p-6 shadow-sm">
-      <h1 className="text-h2 text-ink">Reset your password</h1>
+    <AuthSplit aside={ASIDE}>
+      <h1 className="mt-8 text-h2 text-ink">Reset your password</h1>
       <p className="mt-1 text-body text-muted">
         Enter your email and we&apos;ll send you a link to set a new one.
       </p>
@@ -89,6 +99,6 @@ export default function ForgotPasswordPage() {
           Back to sign in
         </Link>
       </p>
-    </div>
+    </AuthSplit>
   );
 }

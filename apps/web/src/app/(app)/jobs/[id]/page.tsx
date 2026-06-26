@@ -41,12 +41,12 @@ export default function JobBoardPage() {
   if (status === "loading") {
     return (
       <div className="flex h-full flex-col">
-        <div className="sticky top-14 z-20 border-b border-line bg-canvas/95 px-4 py-3 sm:px-6">
+        <div className="sticky top-14 z-20 border-b border-line bg-canvas/95 px-4 py-4 sm:px-6 lg:px-8">
           <div className="h-3 w-12 rounded bg-subtle motion-safe:animate-pulse" />
           <div className="mt-1.5 h-6 w-48 rounded bg-subtle motion-safe:animate-pulse" />
           <div className="mt-1.5 h-3 w-32 rounded bg-subtle motion-safe:animate-pulse" />
         </div>
-        <div className="flex flex-1 gap-3 overflow-hidden px-4 py-4 sm:px-6" aria-hidden>
+        <div className="flex flex-1 gap-4 overflow-hidden px-4 py-6 sm:px-6 sm:py-8 lg:px-8" aria-hidden>
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="h-40 w-72 shrink-0 rounded-md border border-line bg-surface" />
           ))}
@@ -56,7 +56,7 @@ export default function JobBoardPage() {
   }
 
   return (
-    <div className="px-4 py-4 sm:px-6">
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <Link href="/jobs" className="text-sm text-muted transition hover:text-brand">
         ← Jobs
       </Link>

@@ -25,9 +25,9 @@ export function Sidebar() {
   return (
     <nav
       aria-label="Primary"
-      className="hidden w-56 shrink-0 flex-col border-r border-line bg-surface px-3 py-4 lg:flex"
+      className="hidden w-56 shrink-0 flex-col border-r border-line bg-surface px-3 py-5 lg:flex"
     >
-      <ul className="space-y-1">
+      <ul className="space-y-1.5">
         {NAV.map(({ href, label, Icon }) => {
           const active = pathname.startsWith(href);
           return (
@@ -50,7 +50,7 @@ export function Sidebar() {
         })}
       </ul>
 
-      <div className="my-3 border-t border-line" />
+      <div className="my-4 border-t border-line" />
 
       {/* Opens the ⌘K spotlight (semantic candidate search). */}
       <button
@@ -68,7 +68,7 @@ export function Sidebar() {
       </button>
 
       {/* Account/profile pinned to the bottom (design-system §5). */}
-      <div className="mt-auto border-t border-line pt-3">
+      <div className="mt-auto border-t border-line pt-4">
         <ProfileMenu variant="bar" />
       </div>
     </nav>

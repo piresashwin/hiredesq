@@ -367,7 +367,7 @@ export function IngestSurface({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         className={cn(
-          "rounded-lg border-2 border-dashed px-4 py-6 text-center transition",
+          "rounded-lg border-2 border-dashed px-4 py-10 text-center transition sm:py-12",
           dragging ? "border-brand bg-brand-tint" : "border-line bg-subtle/50",
           outOfCredits && "opacity-60",
         )}

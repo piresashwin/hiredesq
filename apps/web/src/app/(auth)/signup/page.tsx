@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { detectTimezone } from "@/lib/timezone";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { SpinnerIcon } from "@/components/ui/Icon";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { AuthSplit } from "@/components/auth/AuthSplit";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -25,7 +27,15 @@ export default function SignupPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const res = await api.signup({ fullName, workspaceName, email, password });
+      const res = await api.signup({
+        fullName,
+        workspaceName,
+        email,
+        password,
+        // Auto-detected so the new account lands on the right timezone + country
+        // without an extra signup field.
+        timezone: detectTimezone(),
+      });
       setSession(res);
       router.replace("/candidates");
     } catch (err) {
@@ -39,8 +49,16 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="rounded-lg border border-line bg-surface p-6 shadow-sm">
-      <h1 className="text-h2 text-ink">Start your desk</h1>
+    <AuthSplit
+      aside={{
+        image: "/onboarding/01-chaos.webp",
+        alt: "Resumes, chat bubbles, an email and a phone scattered in disorder",
+        eyebrow: "Start your desk",
+        headline: "Your candidates are everywhere. Today that ends.",
+        sub: "No setup, no demo, no credit card. Forward the mess and watch it become a clean, searchable candidate pool.",
+      }}
+    >
+      <h1 className="mt-8 text-h2 text-ink">Start your desk</h1>
       <p className="mt-1 text-body text-muted">
         No setup, no demo. You&apos;ll be cleaning up candidates in a minute.
       </p>
@@ -93,13 +111,7 @@ export default function SignupPage() {
           placeholder="At least 8 characters"
         />
 
-        <Button
-          type="submit"
-          variant="primary"
-          size="lg"
-          className="w-full"
-          disabled={submitting}
-        >
+        <Button type="submit" variant="primary" size="lg" className="w-full" disabled={submitting}>
           {submitting ? (
             <>
               <SpinnerIcon className="h-4 w-4 animate-spin" />
@@ -125,6 +137,6 @@ export default function SignupPage() {
           Sign in
         </Link>
       </p>
-    </div>
+    </AuthSplit>
   );
 }

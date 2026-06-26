@@ -7,6 +7,16 @@ import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { SpinnerIcon } from "@/components/ui/Icon";
+import { AuthSplit } from "@/components/auth/AuthSplit";
+
+// Shares the recovery-flow illustration with the forgot-password screen.
+const ASIDE = {
+  image: "/onboarding/03-search.webp",
+  alt: "A plain-English search over a grid of clean candidate cards",
+  eyebrow: "Account recovery",
+  headline: "Let's get you back to your desk.",
+  sub: "Set a new password and pick up right where you left off — your candidate pool is waiting.",
+} as const;
 
 // Complete a password reset using the emailed token (?token=...). On success we
 // bounce to the login page with a success note.
@@ -44,8 +54,8 @@ function ResetForm() {
 
   if (!token) {
     return (
-      <div className="rounded-lg border border-line bg-surface p-6 shadow-sm">
-        <h1 className="text-h2 text-ink">Invalid reset link</h1>
+      <AuthSplit aside={ASIDE}>
+        <h1 className="mt-8 text-h2 text-ink">Invalid reset link</h1>
         <p className="mt-1 text-body text-muted">
           This link is missing its token. Request a fresh one and try again.
         </p>
@@ -55,13 +65,13 @@ function ResetForm() {
         >
           Request a new link
         </Link>
-      </div>
+      </AuthSplit>
     );
   }
 
   return (
-    <div className="rounded-lg border border-line bg-surface p-6 shadow-sm">
-      <h1 className="text-h2 text-ink">Set a new password</h1>
+    <AuthSplit aside={ASIDE}>
+      <h1 className="mt-8 text-h2 text-ink">Set a new password</h1>
       <p className="mt-1 text-body text-muted">Choose a password you don&apos;t use elsewhere.</p>
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
@@ -108,7 +118,7 @@ function ResetForm() {
           )}
         </Button>
       </form>
-    </div>
+    </AuthSplit>
   );
 }
 

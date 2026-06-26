@@ -223,11 +223,55 @@ scannability and number legibility, not editorial prose.
 
 ## 5. Spacing, layout & density
 
-- **4px base grid.** Spacing tokens: `4, 8, 12, 16, 24, 32, 48`. Most in-component
-  spacing is `8`/`12`; section gaps `24`/`32`.
+### Breezy frame, dense data (the governing rule)
+
+Density is a feature **only where the data is** — the 40-row candidate list is
+Priya's spreadsheet, better. Everywhere else, the cramped feeling comes from the
+*frame* being as tight as the data, so nothing separates from anything and density
+reads as clutter instead of hierarchy (a direct violation of Principle 4). The fix
+is a **deliberate spacing hierarchy**: let the structural/containing layer breathe,
+keep the data dense.
+
+- **Breathe (the frame):** page gutters, vertical page padding, gaps *between*
+  sections, gaps *between* cards, card/panel/header internal padding, the sidebar,
+  the ingest dropzone, and empty/first-run surfaces. These get generous, rest-giving
+  space so the eye has somewhere to land.
+- **Stay dense (the data):** table/list **row heights** (40px compact / 48px
+  revenue), **chips & badges** (`px-1.5 py-0.5`), **kanban cards** (`p-2.5`), and
+  inline icon+text gaps within a row. Loosening these costs Priya rows-per-screen —
+  don't. (Kanban *column* gaps are frame, not data — those may breathe.)
+
+> The test: is this element a **container/separator** (frame → breathe) or is it the
+> **data itself / a control packed into a row** (dense → leave it)?
+
+### Spacing roles (use these named values, not ad-hoc numbers)
+
+**4px base grid.** Spacing tokens: `4, 8, 12, 16, 24, 32, 48`. Don't scatter raw
+spacing per page — these roles are owned by the shared layout primitives
+(`PageHeader`, `PageBody`, `Section`) so the rhythm can't drift screen-to-screen.
+
+| Role | Where it applies | Value (mobile → ≥sm/lg) |
+|---|---|---|
+| **Page gutter** | content's left/right edge padding | `px-4 sm:px-6 lg:px-8` |
+| **Page vertical** | top/bottom of the body | `py-6 sm:py-8` |
+| **Section gap** | between major blocks on a page | `space-y-8` (32) |
+| **Card-grid gap** | between sibling cards/tiles | `gap-4 lg:gap-5` (16→20) |
+| **Card / panel padding** | a standard card or panel | `p-5` (20) |
+| **Hero / feature card** | revenue hero, home glance tiles | `p-6 lg:p-7` (24→28) |
+| **Page header band** | `PageHeader` vertical padding | `py-4`; title→subtitle `mt-1` (4) |
+| **Sidebar** | nav container / item rhythm | `px-3 py-5`; items `space-y-1.5` |
+| **Ingest dropzone** | the "magic moment" surface | `py-10 sm:py-12` (40→48) |
+| **Empty / first-run** | guided CTA surfaces | `p-10 sm:p-12` |
+
+Rule of thumb that keeps "breezy" from reading as "loose": **card padding ≥ the gap
+between cards** (so a card feels like a contained surface, not a tile pushed against
+its neighbor) — the old `p-4` in a `gap-3` grid failed this and is why cards ran
+together.
+
 - **Density modes are real.** Tables/lists default to a **compact** row (40px),
   with a comfortable mode (52px) toggle for profile/edit views. Compact is the
-  default because Priya's mental model is a spreadsheet.
+  default because Priya's mental model is a spreadsheet. (This toggle, not looser
+  defaults, is how a user opts into roomier rows — the dense default never moves.)
 - **Radius:** `--radius-sm: 6px` (inputs, chips), `--radius-md: 10px` (cards,
   buttons), `--radius-lg: 14px` (modals, dropzone). Rounded-but-not-pill — modern,
   not playful-toy.
@@ -329,9 +373,17 @@ toggle) belong in the **body**, not that header.
 
 ## 6. Components
 
-Build on **Radix primitives + a thin Tailwind component layer** (shadcn/ui-style):
-accessible, headless, no heavy UI dependency, full control of tokens. This matches
-the project's Tailwind setup and keeps a11y correct by default.
+Build on **Radix primitives (+ cmdk) wrapped in a thin Tailwind component layer**
+(shadcn-style, but we own the source — no shadcn CLI / `cva` / `tailwind-merge`):
+accessible, headless, full control of tokens. Radix owns the *behaviour* (focus
+trap/restore, Esc, scroll-lock, `aria-modal`, roving focus, dismissable layers,
+portals); our `components/ui` layer owns the *look*, styled with tokens. `cmdk`
+covers the command palette and any typeahead/combobox, which Radix doesn't ship.
+**Never hand-roll a dialog, menu, focus trap, or popover** — skin the primitive.
+The migration is complete, behind the existing `ui/` APIs: `Modal`/`SlideOver`/
+`OnboardingCarousel` on Radix `Dialog`, `Menu`/`ProfileMenu` on Radix `DropdownMenu`,
+`NotificationBell` on Radix `Popover`, `Spotlight` on `cmdk`. The hand-rolled
+`useFocusTrap` hook has been retired — don't reintroduce one.
 
 ### 6.1 Buttons
 
@@ -537,7 +589,9 @@ Motion budget is small and purposeful — speed must never *feel* decorative.
   `brand` focus rings (the global `:focus-visible` ring in globals.css), never
   `outline: none` without a replacement.
 - **Radix primitives** give correct roles/ARIA/focus-trapping for menus, dialogs,
-  comboboxes for free — a reason to build on them.
+  popovers for free — a reason to build on them (dialogs, slide-overs, and the row
+  action menu already are). Radix has no combobox, so typeahead + the ⌘K palette use
+  **`cmdk`** (the `Spotlight` already does).
 - **PII handling is a UX surface, not just backend:**
   - **Delete is explicit and honest** — a destructive modal that names what's
     removed ("This deletes Sarah Chen's profile *and* her resume file. Permanent.")
@@ -557,9 +611,10 @@ Motion budget is small and purposeful — speed must never *feel* decorative.
 
 ## 11. Implementation notes
 
-- **Stack:** Tailwind + CSS variables for tokens + Radix primitives + a local
-  `components/ui` layer (shadcn/ui pattern). One font (Inter), one icon set
-  (Lucide). No heavy component framework.
+- **Stack:** Tailwind + CSS variables for tokens + Radix primitives + `cmdk` (command
+  palette / typeahead) + a local `components/ui` layer (shadcn pattern, our own
+  source). One font (Inter); **one local inline icon set** ([Icon.tsx](../apps/web/src/components/ui/Icon.tsx)) —
+  no icon-library dependency. No heavy/styled component framework.
 - **Tokens as the single source of truth** — define the §3/§4/§5 values as CSS
   custom properties in `:root`, map them into `tailwind.config` `theme.extend`, and
   never hardcode a hex in a component. This keeps dark mode and rebrands contained.

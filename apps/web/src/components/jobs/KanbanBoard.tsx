@@ -279,7 +279,7 @@ export function KanbanBoard({ job }: { job: JobDto }) {
         onAddCvs={() => setIngestOpen(true)}
       />
 
-      <div className="flex-1 overflow-hidden px-4 py-4 sm:px-6">
+      <div className="flex-1 overflow-hidden px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {loading ? (
           <BoardSkeleton />
         ) : error ? (
@@ -290,8 +290,8 @@ export function KanbanBoard({ job }: { job: JobDto }) {
             onAddCvs={() => setIngestOpen(true)}
           />
         ) : view === "board" ? (
-          <div className="flex h-full flex-col gap-3">
-            <div className="flex flex-1 gap-3 overflow-x-auto pb-2">
+          <div className="flex h-full flex-col gap-4">
+            <div className="flex flex-1 gap-4 overflow-x-auto pb-2">
               {BOARD_STAGES.map((stage) => (
                 <BoardColumn
                   key={stage}
@@ -450,7 +450,7 @@ function BoardHeader({
   onAddCvs: () => void;
 }) {
   return (
-    <div className="sticky top-14 z-20 border-b border-line bg-canvas/95 px-4 py-3 backdrop-blur sm:px-6">
+    <div className="sticky top-14 z-20 border-b border-line bg-canvas/95 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <Link href="/jobs" className="text-sm text-muted transition hover:text-brand">
@@ -1025,7 +1025,7 @@ function ListView({
 // ── Loading / error / empty ────────────────────────────────────────────────
 function BoardSkeleton() {
   return (
-    <div className="flex h-full gap-3 overflow-hidden" aria-hidden>
+    <div className="flex h-full gap-4 overflow-hidden" aria-hidden>
       {BOARD_STAGES.map((stage) => (
         <div key={stage} className="flex w-72 shrink-0 flex-col rounded-md border border-line">
           <div className={cn("h-1 rounded-t-md", STAGE_ACCENT[stage].bar)} />

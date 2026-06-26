@@ -18,6 +18,8 @@ import { InboundEmailModule } from "./modules/inbound-email/inbound-email.module
 import { BillingModule } from "./modules/billing/billing.module.js";
 import { UpgradeInterestModule } from "./modules/upgrade-interest/upgrade-interest.module.js";
 import { StatsModule } from "./modules/stats/stats.module.js";
+import { CustomFieldsModule } from "./modules/custom-fields/custom-fields.module.js";
+import { NotificationsModule } from "./modules/notifications/notifications.module.js";
 
 // CommonModule is @Global() — provides PrismaService + the guard stack to every
 // feature module. Each workspace-scoped module follows the /nestjs-module skill.
@@ -42,6 +44,8 @@ import { StatsModule } from "./modules/stats/stats.module.js";
     BillingModule,
     UpgradeInterestModule,
     StatsModule,
+    CustomFieldsModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

@@ -5,7 +5,8 @@
 // The whole suite skips cleanly when no DB is reachable, so the pure-unit run is safe.
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import type { CandidateProfile } from "@hiredesq/shared";
+import type { BatchParseItem, CandidateProfile } from "@hiredesq/shared";
+import type { BatchParseResult } from "@hiredesq/ai";
 import { INGEST_FREE_LIMIT } from "@hiredesq/core";
 // Reuse the processor's OWN PrismaClient so seeds + asserts share its connection/DB.
 import {
@@ -13,7 +14,10 @@ import {
   upsertCandidate,
   reserveIngestSlot,
   releaseIngestSlot,
+  failParseAndReleaseSlot,
+  type EmbedPair,
 } from "../src/parse.processor.js";
+import { settleResults } from "../src/batch.processor.js";
 
 let dbUp = false;
 before(async () => {
@@ -130,6 +134,123 @@ describe("worker race conditions (integration)", () => {
       assert.equal(await reserveIngestSlot(ws, "h"), true, "first claim meters");
       assert.equal(await reserveIngestSlot(ws, "h"), false, "retry of a processing job reuses its slot");
       assert.equal((await prisma.creditAccount.findUniqueOrThrow({ where: { workspaceId: ws } })).ingestUsedLifetime, 1, "metered exactly once");
+    } finally {
+      await dropWorkspace(ws);
+    }
+  });
+
+  it("failParseAndReleaseSlot: frees the slot durably even when the in-memory flag is lost", async (t) => {
+    if (!dbUp) return t.skip("no DB");
+    // The bulk-coordinator retry leak: an item is reserved (slot held, status
+    // `processing`) on attempt 1, the coordinator throws at the batch level, and the
+    // retry's `metered` Set is empty — so the OLD `if (metered) release` never freed it.
+    // The durable helper releases from DB state instead.
+    const ws = await mkWorkspace({ plan: "free", used: 10 });
+    try {
+      await prisma.parseJob.create({ data: { workspaceId: ws, contentHash: "h", status: "queued" } });
+      assert.equal(await reserveIngestSlot(ws, "h"), true);
+      assert.equal((await prisma.creditAccount.findUniqueOrThrow({ where: { workspaceId: ws } })).ingestUsedLifetime, 11);
+
+      await failParseAndReleaseSlot(ws, "h", "source build failed");
+      const job = await prisma.parseJob.findUniqueOrThrow({ where: { workspaceId_contentHash: { workspaceId: ws, contentHash: "h" } } });
+      assert.equal(job.status, "failed");
+      assert.equal(job.error, "source build failed");
+      assert.equal((await prisma.creditAccount.findUniqueOrThrow({ where: { workspaceId: ws } })).ingestUsedLifetime, 10, "slot released exactly once");
+    } finally {
+      await dropWorkspace(ws);
+    }
+  });
+
+  it("failParseAndReleaseSlot: idempotent — a second call never double-releases", async (t) => {
+    if (!dbUp) return t.skip("no DB");
+    const ws = await mkWorkspace({ plan: "free", used: 10 });
+    try {
+      await prisma.parseJob.create({ data: { workspaceId: ws, contentHash: "h", status: "queued" } });
+      await reserveIngestSlot(ws, "h");
+      await failParseAndReleaseSlot(ws, "h", "store failed");
+      await failParseAndReleaseSlot(ws, "h", "store failed"); // coordinator re-runs
+      assert.equal((await prisma.creditAccount.findUniqueOrThrow({ where: { workspaceId: ws } })).ingestUsedLifetime, 10, "released once, not twice");
+    } finally {
+      await dropWorkspace(ws);
+    }
+  });
+
+  it("failParseAndReleaseSlot: never touches the counter for a paid (unmetered) item", async (t) => {
+    if (!dbUp) return t.skip("no DB");
+    const ws = await mkWorkspace({ plan: "team", used: 10 });
+    try {
+      await prisma.parseJob.create({ data: { workspaceId: ws, contentHash: "h", status: "queued" } });
+      assert.equal(await reserveIngestSlot(ws, "h"), false, "paid plan is unmetered (no slot held)");
+      await failParseAndReleaseSlot(ws, "h", "store failed");
+      assert.equal((await prisma.creditAccount.findUniqueOrThrow({ where: { workspaceId: ws } })).ingestUsedLifetime, 10, "paid counter untouched");
+      assert.equal((await prisma.parseJob.findUniqueOrThrow({ where: { workspaceId_contentHash: { workspaceId: ws, contentHash: "h" } } })).status, "failed");
+    } finally {
+      await dropWorkspace(ws);
+    }
+  });
+
+  it("failParseAndReleaseSlot: a quota-rejected item (never processing) is failed without release", async (t) => {
+    if (!dbUp) return t.skip("no DB");
+    // reserve's transaction rolls back on quota exhaustion, leaving the row in its
+    // prior status — the helper must record the failure but NOT decrement the counter.
+    const ws = await mkWorkspace({ plan: "free", used: INGEST_FREE_LIMIT });
+    try {
+      await prisma.parseJob.create({ data: { workspaceId: ws, contentHash: "h", status: "queued" } });
+      await assert.rejects(reserveIngestSlot(ws, "h"), /quota/i);
+      await failParseAndReleaseSlot(ws, "h", "Free ingest limit reached — upgrade to keep parsing.");
+      assert.equal((await prisma.creditAccount.findUniqueOrThrow({ where: { workspaceId: ws } })).ingestUsedLifetime, INGEST_FREE_LIMIT, "counter stays at the cap (nothing was reserved)");
+      assert.equal((await prisma.parseJob.findUniqueOrThrow({ where: { workspaceId_contentHash: { workspaceId: ws, contentHash: "h" } } })).status, "failed");
+    } finally {
+      await dropWorkspace(ws);
+    }
+  });
+
+  it("settleResults: settles only `processing` items and is idempotent on a resume re-run", async (t) => {
+    if (!dbUp) return t.skip("no DB");
+    // Simulates the HIGH-2 resume path: a provider batch was submitted (id persisted),
+    // the coordinator died before settling, and the retry reconnects + settles from
+    // durable state. Driven by settleResults so it needs no live Anthropic batch.
+    const ws = await mkWorkspace({ plan: "free", used: 10 });
+    const acct = () => prisma.creditAccount.findUniqueOrThrow({ where: { workspaceId: ws } });
+    try {
+      const batch = await prisma.importBatch.create({
+        data: { workspaceId: ws, source: "bulk_import", total: 2, status: "processing", providerBatchId: "msgbatch_test" },
+      });
+      await prisma.parseJob.createMany({
+        data: [
+          { workspaceId: ws, contentHash: "ok", batchId: batch.id, status: "queued" },
+          { workspaceId: ws, contentHash: "bad", batchId: batch.id, status: "queued" },
+        ],
+      });
+      // Both AI items reserved on attempt 1 (slot held, status → processing).
+      await reserveIngestSlot(ws, "ok");
+      await reserveIngestSlot(ws, "bad");
+      assert.equal((await acct()).ingestUsedLifetime, 12, "two slots reserved");
+
+      const item = (h: string): BatchParseItem => ({ contentHash: h, kind: "text", source: "bulk_import", parseJobId: h });
+      const itemByHash = new Map<string, BatchParseItem>([["ok", item("ok")], ["bad", item("bad")]]);
+      const results: BatchParseResult[] = [
+        { customId: "ok", profile: profile("resume@example.com") },
+        { customId: "bad", error: "batch request errored" },
+      ];
+      const toEmbed: EmbedPair[] = [];
+      await settleResults(ws, batch.id, undefined, results, itemByHash, toEmbed);
+
+      const jobs = new Map((await prisma.parseJob.findMany({ where: { workspaceId: ws, batchId: batch.id } })).map((j) => [j.contentHash, j]));
+      assert.equal(jobs.get("ok")!.status, "done");
+      assert.ok(jobs.get("ok")!.candidateId, "candidate attached on success");
+      assert.equal(jobs.get("bad")!.status, "failed");
+      assert.equal((await acct()).ingestUsedLifetime, 11, "failed item's slot released; the success keeps its slot");
+      let b = await prisma.importBatch.findUniqueOrThrow({ where: { id: batch.id } });
+      assert.deepEqual([b.done, b.failed, b.status], [1, 1, "done"], "done+failed == total flips the batch to done");
+      assert.equal(toEmbed.length, 1, "only the success is queued for embedding");
+
+      // Resume re-run (e.g. the embedding pass crashed, pg-boss retries): nothing is
+      // `processing` now → a complete no-op. No double-count, no double-release.
+      await settleResults(ws, batch.id, undefined, results, itemByHash, []);
+      b = await prisma.importBatch.findUniqueOrThrow({ where: { id: batch.id } });
+      assert.deepEqual([b.done, b.failed], [1, 1], "counters unchanged on resume re-run");
+      assert.equal((await acct()).ingestUsedLifetime, 11, "no double release on resume");
     } finally {
       await dropWorkspace(ws);
     }

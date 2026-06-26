@@ -19,7 +19,12 @@ import {
   normalizeName,
   type ExistingCandidate,
 } from "@hiredesq/core";
-import { BULK_BATCH_THRESHOLD, type CandidateProfile, type ParseJobData } from "@hiredesq/shared";
+import {
+  BULK_BATCH_THRESHOLD,
+  buildNotification,
+  type CandidateProfile,
+  type ParseJobData,
+} from "@hiredesq/shared";
 import { Storage } from "@hiredesq/storage";
 import { extractPdf, extractDocx, hasTextLayer, readCsv, readXlsx } from "./extract.js";
 import { mapRow } from "./csv-map.js";
@@ -453,14 +458,38 @@ export async function bumpBatch(
     });
     const batch = await tx.importBatch.findFirst({
       where: { id: batchId, workspaceId },
-      select: { total: true, done: true, failed: true, status: true },
+      select: { total: true, done: true, failed: true, duplicates: true, jobId: true, status: true },
     });
     if (batch && batch.status === "processing" && batch.done + batch.failed >= batch.total) {
       // Guard on status:"processing" so the completion transition fires exactly once.
-      await tx.importBatch.updateMany({
+      const flipped = await tx.importBatch.updateMany({
         where: { id: batchId, workspaceId, status: "processing" },
         data: { status: "done" },
       });
+      // Phase 1 trigger: the EXACTLY-ONCE winner (the only call whose conditional flip
+      // matched a still-`processing` row) raises the bulk-complete notification IN the
+      // same transaction, so it's idempotent and fires once per batch. Same shape as the
+      // API's NotificationsService.emit — both go through the shared buildNotification.
+      // Counts/ids only, never PII (§2). Notifications are workspace-level (userId null).
+      if (flipped.count > 0) {
+        const built = buildNotification("bulk_import_complete", {
+          batchId,
+          total: batch.total,
+          done: batch.done,
+          duplicates: batch.duplicates,
+          failed: batch.failed,
+        });
+        await tx.notification.create({
+          data: {
+            workspaceId,
+            userId: null,
+            type: built.type,
+            title: built.title,
+            body: built.body,
+            data: built.data,
+          },
+        });
+      }
     }
   });
 }
@@ -536,6 +565,55 @@ export async function releaseIngestSlot(workspaceId: string): Promise<void> {
   await prisma.creditAccount.updateMany({
     where: { workspaceId, ingestUsedLifetime: { gt: 0 } },
     data: { ingestUsedLifetime: { decrement: 1 } },
+  });
+}
+
+/**
+ * Fail a parse and release any ingest slot it holds — durably, from DB state, so it
+ * stays correct across a coordinator retry where the in-memory "did I reserve" flag
+ * is lost (§4). The bulk coordinator can throw at the batch level (Anthropic submit /
+ * poll-timeout) AFTER items were reserved, leaving them `processing` with a slot held;
+ * on the pg-boss retry the `metered` Set is empty, so the old `if (metered) release`
+ * never freed those slots — a quota leak. This releases iff THIS call wins the
+ * `processing → failed` transition AND the workspace is on the metered (free) plan,
+ * so a slot is freed exactly once and never for a paid (unmetered) item.
+ *
+ * Idempotent: a re-run finds the row already `failed`/`done`, records the error
+ * without touching the counter, and never double-releases. Never overwrites a `done`
+ * row. The error string must already be safe (toSafeParseError) — never PII (§2).
+ * Tenant-scoped (§1).
+ */
+export async function failParseAndReleaseSlot(
+  workspaceId: string,
+  contentHash: string,
+  error: string,
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    // Win the processing→failed transition. count>0 ⇒ a slot was held (reserve
+    // increments only on the pending→processing claim), so THIS call releases it.
+    const flipped = await tx.parseJob.updateMany({
+      where: { workspaceId, contentHash, status: "processing" },
+      data: { status: "failed", error },
+    });
+    if (flipped.count === 0) {
+      // Not currently processing (quota-rejected → rolled back, already failed, or
+      // done): record the error without releasing. Never clobber a `done` row.
+      await tx.parseJob.updateMany({
+        where: { workspaceId, contentHash, status: { not: "done" } },
+        data: { status: "failed", error },
+      });
+      return;
+    }
+    const account = await tx.creditAccount.findUnique({
+      where: { workspaceId },
+      select: { workspace: { select: { plan: true } } },
+    });
+    if (account?.workspace.plan === "free") {
+      await tx.creditAccount.updateMany({
+        where: { workspaceId, ingestUsedLifetime: { gt: 0 } },
+        data: { ingestUsedLifetime: { decrement: 1 } },
+      });
+    }
   });
 }
 

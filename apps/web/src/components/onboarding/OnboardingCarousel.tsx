@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "@/lib/cn";
-import { useFocusTrap } from "@/lib/useFocusTrap";
 import { Button } from "@/components/ui/Button";
 import {
   ArrowRightIcon,
@@ -106,7 +106,6 @@ export function OnboardingCarousel({
 }: {
   onComplete: () => Promise<void> | void;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const [finishing, setFinishing] = useState(false);
   const isLast = index === STEPS.length - 1;
@@ -130,8 +129,7 @@ export function OnboardingCarousel({
 
   const prev = useCallback(() => setIndex((i) => Math.max(i - 1, 0)), []);
 
-  // Esc skips the tour (treated as "seen"); arrows page through it.
-  useFocusTrap(ref, true, () => void finish());
+  // Arrows page through; Esc skips (handled by the Dialog's onOpenChange → finish).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight") next();
@@ -152,26 +150,28 @@ export function OnboardingCarousel({
   const step = STEPS[index]!; // index is always clamped to a valid step
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-stretch justify-center sm:items-center sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="onboarding-title"
+    <Dialog.Root
+      open
+      onOpenChange={(next) => {
+        // Esc (Radix's only built-in close path here — outside-click is disabled
+        // below) is treated as skipping the tour: mark it seen.
+        if (!next) void finish();
+      }}
     >
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-ink/40 motion-safe:animate-[fade_140ms_ease-out]"
-      />
-      <div
-        ref={ref}
-        tabIndex={-1}
-        className={cn(
-          "relative flex w-full flex-col bg-surface shadow-lg outline-none",
-          "sm:max-w-3xl sm:rounded-lg sm:overflow-hidden",
-          "motion-safe:animate-[popIn_140ms_ease-out]",
-        )}
-      >
-        {/* Skip — top-right, always reachable. Marks the tour as seen. */}
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[60] bg-ink/40 motion-safe:animate-[fade_140ms_ease-out]" />
+        <div className="pointer-events-none fixed inset-0 z-[60] flex items-stretch justify-center sm:items-center sm:p-4">
+          <Dialog.Content
+            // The backdrop is non-dismissing (matches prior behaviour); only Skip/Esc
+            // end the tour, so a stray click doesn't blow away the first-run story.
+            onInteractOutside={(e) => e.preventDefault()}
+            className={cn(
+              "pointer-events-auto relative flex w-full flex-col bg-surface shadow-lg outline-none",
+              "sm:max-w-3xl sm:overflow-hidden sm:rounded-lg",
+              "motion-safe:animate-[popIn_140ms_ease-out]",
+            )}
+          >
+            {/* Skip — top-right, always reachable. Marks the tour as seen. */}
         <button
           type="button"
           onClick={() => void finish()}
@@ -202,10 +202,10 @@ export function OnboardingCarousel({
           <p className="text-label font-semibold uppercase tracking-wide text-brand">
             {step.eyebrow}
           </p>
-          <h2 id="onboarding-title" className="mt-2 text-h2 font-bold text-ink">
-            {step.title}
-          </h2>
-          <p className="mt-3 max-w-prose text-body text-muted">{step.body}</p>
+          <Dialog.Title className="mt-2 text-h2 font-bold text-ink">{step.title}</Dialog.Title>
+          <Dialog.Description className="mt-3 max-w-prose text-body text-muted">
+            {step.body}
+          </Dialog.Description>
         </div>
 
         {/* Feature-stack rail — names the loop and shows how each beat builds on
@@ -292,7 +292,9 @@ export function OnboardingCarousel({
             </Button>
           </div>
         </div>
-      </div>
-    </div>
+          </Dialog.Content>
+        </div>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

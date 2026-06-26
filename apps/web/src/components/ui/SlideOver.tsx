@@ -1,14 +1,16 @@
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import { type ReactNode } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "@/lib/cn";
-import { useFocusTrap } from "@/lib/useFocusTrap";
 import { CloseIcon } from "@/components/ui/Icon";
 
 // Right-edge slide-over panel for the candidate profile (design-system §6.4) —
 // preferred over full navigation so the recruiter keeps her place in the list.
-// Hand-rolled a11y: role=dialog, focus trap, Esc to close, scrim click to close.
-// Transition respects prefers-reduced-motion via motion-reduce: utilities.
+// Built on Radix Dialog (the project's behaviour-primitive layer): focus trap +
+// restore, Esc, scroll-lock, aria-modal, scrim dismissal. The visible header is the
+// caller's (SlideOverHeader); a visually-hidden Dialog.Title carries the accessible
+// name Radix requires. Transition respects prefers-reduced-motion via motion-reduce.
 
 export function SlideOver({
   open,
@@ -25,38 +27,30 @@ export function SlideOver({
    *  layout (candidate profile). */
   size?: "md" | "xl";
 }) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(panelRef, open, onClose);
-
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50" aria-hidden={false}>
-      {/* Scrim */}
-      <button
-        type="button"
-        aria-label="Close panel"
-        onClick={onClose}
-        className="absolute inset-0 bg-ink/30 motion-safe:animate-[fade_140ms_ease-out]"
-        tabIndex={-1}
-      />
-      {/* Panel */}
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        tabIndex={-1}
-        className={cn(
-          "absolute right-0 top-0 flex h-full w-full flex-col bg-surface shadow-lg outline-none",
-          // `xl` (candidate profile): ~10% wider than the old max-w-4xl (896px → 986px).
-          size === "xl" ? "max-w-[986px]" : "max-w-md",
-          "motion-safe:animate-[slideIn_160ms_ease-out]",
-        )}
-      >
-        {children}
-      </div>
-    </div>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-ink/30 motion-safe:animate-[fade_140ms_ease-out]" />
+        <Dialog.Content
+          className={cn(
+            "fixed right-0 top-0 z-50 flex h-full w-full flex-col bg-surface shadow-lg outline-none",
+            // `xl` (candidate profile): ~10% wider than the old max-w-4xl (896px → 986px).
+            size === "xl" ? "max-w-[986px]" : "max-w-md",
+            "motion-safe:animate-[slideIn_160ms_ease-out]",
+          )}
+        >
+          {/* The visible title lives in the caller's header; this is the accessible
+              name Radix needs (sr-only keeps the layout identical to before). */}
+          <Dialog.Title className="sr-only">{title}</Dialog.Title>
+          {children}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 

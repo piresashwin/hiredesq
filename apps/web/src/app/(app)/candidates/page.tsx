@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageBody } from "@/components/ui/PageBody";
 import { PlusIcon, SearchIcon, SparkleIcon, TypeIcon } from "@/components/ui/Icon";
 import { CandidateTable } from "@/components/candidate/CandidateTable";
 import { CandidateSkeleton } from "@/components/candidate/CandidateSkeleton";
@@ -219,17 +220,15 @@ function CandidatesDesk() {
         />
       ) : null}
 
-      <div
-        className="mx-auto w-full max-w-screen-2xl flex-1 px-4 py-4 sm:px-6"
-        data-tour="candidates-list"
-      >
+      <PageBody>
+        <div className="contents" data-tour="candidates-list">
         {showEmptyIngest ? (
           <EmptyIngest onReviewDuplicates={() => setReviewOpen(true)} />
         ) : (
           <>
             {/* Search/filter toolbar leads the body (§5 — it operates on the data,
                 so it lives in the body, not the header). */}
-            <div className="mb-4" data-tour="candidates-search">
+            <div className="mb-6" data-tour="candidates-search">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                 <div className="relative min-w-0 flex-1">
                   <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
@@ -288,7 +287,8 @@ function CandidatesDesk() {
             )}
           </>
         )}
-      </div>
+        </div>
+      </PageBody>
 
       <CandidateProfile
         candidate={selected}
@@ -369,7 +369,7 @@ function SearchModeButton({
 
 function EmptyIngest({ onReviewDuplicates }: { onReviewDuplicates: () => void }) {
   return (
-    <div className="mx-auto max-w-2xl py-6 sm:py-10">
+    <div className="mx-auto max-w-2xl py-10 sm:py-12">
       <div className="mb-6 text-center">
         <h1 className="text-h1 text-ink">Let&apos;s build your candidate database</h1>
         <p className="mt-1 text-body text-muted">

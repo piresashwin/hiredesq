@@ -45,9 +45,9 @@ export function Stat({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-md border border-line bg-surface p-4", className)}>
+    <div className={cn("rounded-md border border-line bg-surface p-5", className)}>
       <div className="text-label uppercase text-muted">{label}</div>
-      <div className="mt-1">{children}</div>
+      <div className="mt-1.5">{children}</div>
     </div>
   );
 }

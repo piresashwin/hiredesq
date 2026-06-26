@@ -94,7 +94,7 @@ export function HomeDashboard() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-screen-2xl flex-1 space-y-6 px-4 py-5 sm:px-6">
+      <div className="mx-auto w-full max-w-screen-2xl flex-1 space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {loading ? (
           <HomeSkeleton />
         ) : error ? (
@@ -125,7 +125,7 @@ function ReturningHome({
     <>
       {/* GLANCE — three calm tiles, each a doorway to the surface behind it. */}
       <section
-        className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:gap-5"
         aria-label="At a glance"
         data-tour="home-glance"
       >
@@ -162,7 +162,7 @@ function ReturningHome({
         {nothingPending ? (
           <AllCaughtUp onAdd={onAdd} />
         ) : (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
             {clearingSoon.count > 0 ? (
               <AttentionCard
                 tone="warning"
@@ -227,7 +227,7 @@ function GlanceTile({
   return (
     <Link
       href={href}
-      className="group rounded-lg border border-line bg-surface p-5 transition hover:border-brand/30 hover:bg-subtle/40"
+      className="group rounded-lg border border-line bg-surface p-6 transition hover:border-brand/30 hover:bg-subtle/40 lg:p-7"
     >
       <div className="flex items-center gap-1.5 text-label uppercase text-muted">
         {icon}
@@ -348,7 +348,7 @@ function AllCaughtUp({ onAdd }: { onAdd: () => void }) {
 // ── First run — the empty-state killer (MVP-SPEC §2A, design-system Principle 2).
 function FirstRun({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-8 text-center sm:p-10">
+    <div className="mx-auto max-w-2xl rounded-lg border border-line bg-surface p-10 text-center sm:p-12">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-tint">
         <UsersIcon className="h-6 w-6 text-brand" />
       </div>
@@ -388,17 +388,17 @@ function MiniStep({ n, label }: { n: number; label: string }) {
 // ── Loading / error ────────────────────────────────────────────────────────
 function HomeSkeleton() {
   return (
-    <div className="space-y-6" aria-hidden>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="space-y-8" aria-hidden>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:gap-5">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="rounded-lg border border-line bg-surface p-5">
+          <div key={i} className="rounded-lg border border-line bg-surface p-6 lg:p-7">
             <div className="h-3 w-28 rounded bg-subtle motion-safe:animate-pulse" />
             <div className="mt-2 h-7 w-24 rounded bg-subtle motion-safe:animate-pulse" />
             <div className="mt-2 h-3 w-36 rounded bg-subtle motion-safe:animate-pulse" />
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
         {[0, 1].map((i) => (
           <div key={i} className="rounded-lg border border-line bg-surface p-5">
             <div className="h-4 w-44 rounded bg-subtle motion-safe:animate-pulse" />

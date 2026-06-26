@@ -5,6 +5,7 @@ import type {
   AddNoteInput,
   CandidateDto,
   CandidateJobHistoryDto,
+  CustomFieldDefinitionDto,
   EducationEntry,
   ExperienceEntry,
   NoteDto,
@@ -111,7 +112,19 @@ export function CandidateProfile({
   async function save(patch: UpdateCandidateInput): Promise<boolean> {
     if (!candidate) return false;
     const prev = candidate;
-    onUpdated({ ...candidate, ...patch } as CandidateDto);
+    const optimistic = { ...candidate, ...patch } as CandidateDto;
+    // customFields is a partial patch (one key) — MERGE into the existing map rather
+    // than letting the spread replace the whole thing. null/"" clears a key, mirroring
+    // the server. The authoritative map comes back from the PATCH response below.
+    if (patch.customFields) {
+      const merged = { ...candidate.customFields };
+      for (const [k, v] of Object.entries(patch.customFields)) {
+        if (v === null || v === "") delete merged[k];
+        else merged[k] = v;
+      }
+      optimistic.customFields = merged;
+    }
+    onUpdated(optimistic);
     try {
       const saved = await api.updateCandidate(candidate.id, patch);
       onUpdated(saved);
@@ -256,6 +269,24 @@ function PersonalDetails({
   candidate: CandidateDto;
   save: (patch: UpdateCandidateInput) => Promise<boolean>;
 }) {
+  // Workspace-configured custom fields (Settings → Candidate fields). Best-effort —
+  // a load failure just hides them; the built-in fields always render.
+  const [customFields, setCustomFields] = useState<CustomFieldDefinitionDto[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .listCustomFields()
+      .then((defs) => {
+        if (!cancelled) setCustomFields(defs);
+      })
+      .catch(() => {
+        /* config fetch is best-effort — built-in fields still render */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="divide-y divide-line">
       <EditableField
@@ -350,9 +381,115 @@ function PersonalDetails({
           hint="Professional licenses / certifications (e.g. BLS, ACLS, PMP)."
         />
       </div>
+
+      {customFields.map((field) => (
+        <CustomFieldRow
+          key={field.id}
+          field={field}
+          value={candidate.customFields[field.id]}
+          save={save}
+        />
+      ))}
     </div>
   );
 }
+
+// One workspace-custom field on the candidate, matching the built-in fields' left-
+// label/right-value row. text/number reuse the inline EditableField; date/select/
+// boolean get a type-appropriate control that commits on change. An empty value
+// clears the field (sent as null, §custom-fields merge).
+function CustomFieldRow({
+  field,
+  value,
+  save,
+}: {
+  field: CustomFieldDefinitionDto;
+  value: string | undefined;
+  save: (patch: UpdateCandidateInput) => Promise<boolean>;
+}) {
+  const set = (v: string | null) => save({ customFields: { [field.id]: v } });
+
+  if (field.type === "text" || field.type === "number") {
+    return (
+      <EditableField
+        label={field.label}
+        value={value ?? ""}
+        placeholder={field.type === "number" ? "Add a number" : `Add ${field.label.toLowerCase()}`}
+        onSave={(v) => set(v.trim() || null)}
+      />
+    );
+  }
+
+  const controlId = `custom-${field.id}`;
+  return (
+    <div className="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-center sm:gap-3">
+      <label htmlFor={controlId} className="shrink-0 text-label text-muted sm:w-28">
+        {field.label}
+      </label>
+      <div className="sm:flex sm:flex-1 sm:justify-end">
+        {field.type === "date" ? (
+          <input
+            id={controlId}
+            type="date"
+            value={value ?? ""}
+            onChange={(e) => void set(e.target.value || null)}
+            className="h-8 rounded-sm border border-line bg-surface px-2 text-body text-ink transition focus:border-brand"
+          />
+        ) : field.type === "select" ? (
+          <select
+            id={controlId}
+            value={value ?? ""}
+            onChange={(e) => void set(e.target.value || null)}
+            className="h-8 max-w-[200px] rounded-sm border border-line bg-surface px-2 text-body text-ink transition focus:border-brand"
+          >
+            <option value="">—</option>
+            {field.options.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        ) : (
+          // boolean — Yes / No / Unknown (clears)
+          <div
+            role="radiogroup"
+            aria-label={field.label}
+            className="inline-flex flex-wrap gap-1.5"
+          >
+            {BOOLEAN_OPTIONS.map((opt) => {
+              const selected = (value ?? "") === opt.value;
+              return (
+                <button
+                  key={opt.label}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => {
+                    if (!selected) void set(opt.value || null);
+                  }}
+                  className={cn(
+                    "rounded-sm border px-2.5 py-1 text-sm font-medium transition",
+                    selected
+                      ? "border-brand bg-brand-tint text-brand"
+                      : "border-line text-muted hover:text-ink",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const BOOLEAN_OPTIONS = [
+  { label: "Yes", value: "true" },
+  { label: "No", value: "false" },
+  { label: "Unknown", value: "" },
+];
 
 // ─────────────────────────── Photo ───────────────────────────
 

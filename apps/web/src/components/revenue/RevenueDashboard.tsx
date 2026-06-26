@@ -89,7 +89,7 @@ export function RevenueDashboard() {
         sticky={false}
       />
 
-      <div className="mx-auto w-full max-w-screen-2xl flex-1 space-y-6 px-4 py-5 sm:px-6">
+      <div className="mx-auto w-full max-w-screen-2xl flex-1 space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {loading ? (
           <DashboardSkeleton />
         ) : error ? (
@@ -162,10 +162,10 @@ function DashboardBody({
     <>
       {/* HERO — Revenue cleared (earned) is the confident headline; Revenue at-risk
           is the softer, cautionary sibling (provisional money, §2E/§3). */}
-      <section className="grid gap-3 sm:grid-cols-3" aria-label="Revenue summary headline">
+      <section className="grid gap-4 sm:grid-cols-3 lg:gap-5" aria-label="Revenue summary headline">
         {/* Cleared — primary, money-green, count-up. Spans 2 cols on desktop. */}
         <div
-          className="rounded-lg border border-line bg-surface p-5 sm:col-span-2 sm:p-6"
+          className="rounded-lg border border-line bg-surface p-6 sm:col-span-2 lg:p-7"
           aria-label="Revenue cleared"
           data-tour="revenue-headline"
         >
@@ -183,7 +183,7 @@ function DashboardBody({
 
         {/* At-risk — secondary, softer/cautionary. Never presented as final. */}
         <div
-          className="rounded-lg border border-warning/30 bg-warning-tint/40 p-5 sm:p-6"
+          className="rounded-lg border border-warning/30 bg-warning-tint/40 p-6 lg:p-7"
           aria-label="Revenue at risk"
           data-tour="revenue-breakdown"
         >
@@ -205,7 +205,7 @@ function DashboardBody({
       </section>
 
       {/* SECONDARY STATS — all from the summary. */}
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Revenue stats">
+      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-5" aria-label="Revenue stats">
         <Stat label={`Placements in ${monthName}`}>
           <span className="nums text-h1 tabular-nums text-ink">{summary.placementsThisMonth}</span>
         </Stat>
@@ -295,7 +295,7 @@ function MonthlyTrend({
 
   return (
     <section
-      className="rounded-lg border border-line bg-surface p-4 sm:p-5"
+      className="rounded-lg border border-line bg-surface p-5 sm:p-6"
       aria-label="Monthly trend"
     >
       <div className="flex items-center justify-between">
@@ -504,28 +504,28 @@ function RevenueEmptyState() {
 // ── Loading / error ──────────────────────────────────────────────────────
 function DashboardSkeleton() {
   return (
-    <div className="space-y-6" aria-hidden>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-lg border border-line bg-surface p-5 sm:col-span-2 sm:p-6">
+    <div className="space-y-8" aria-hidden>
+      <div className="grid gap-4 sm:grid-cols-3 lg:gap-5">
+        <div className="rounded-lg border border-line bg-surface p-6 sm:col-span-2 lg:p-7">
           <div className="h-3 w-40 rounded bg-subtle motion-safe:animate-pulse" />
           <div className="mt-2 h-9 w-56 rounded bg-subtle motion-safe:animate-pulse" />
           <div className="mt-2 h-3 w-48 rounded bg-subtle motion-safe:animate-pulse" />
         </div>
-        <div className="rounded-lg border border-line bg-surface p-5 sm:p-6">
+        <div className="rounded-lg border border-line bg-surface p-6 lg:p-7">
           <div className="h-3 w-20 rounded bg-subtle motion-safe:animate-pulse" />
           <div className="mt-2 h-7 w-32 rounded bg-subtle motion-safe:animate-pulse" />
           <div className="mt-2 h-3 w-28 rounded bg-subtle motion-safe:animate-pulse" />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-5">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="rounded-md border border-line bg-surface p-4">
+          <div key={i} className="rounded-md border border-line bg-surface p-5">
             <div className="h-3 w-24 rounded bg-subtle motion-safe:animate-pulse" />
             <div className="mt-2 h-6 w-20 rounded bg-subtle motion-safe:animate-pulse" />
           </div>
         ))}
       </div>
-      <div className="rounded-lg border border-line bg-surface p-4 sm:p-5">
+      <div className="rounded-lg border border-line bg-surface p-5 sm:p-6">
         <div className="h-3 w-28 rounded bg-subtle motion-safe:animate-pulse" />
         <div className="mt-4 flex items-end gap-3" style={{ height: 160 }}>
           {[40, 70, 55, 90, 65, 100].map((h, i) => (

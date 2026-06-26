@@ -156,7 +156,7 @@ export function JobsIndex() {
       />
 
       <div
-        className="mx-auto w-full max-w-screen-2xl flex-1 px-4 py-4 sm:px-6"
+        className="mx-auto w-full max-w-screen-2xl flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-8"
         data-tour="jobs-list"
       >
         {loading ? (

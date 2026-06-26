@@ -59,6 +59,11 @@ of it as sensitive personal data (GDPR / India DPDP / equivalents apply).
 - When sending resume content to the AI provider for parsing, send only what the
   parse needs; never attach unrelated workspace data to the prompt.
 - Uploaded files live in object storage, not the DB; the DB holds a key + metadata.
+- **Notifications carry no PII.** A notification's title/body/`data` is counts, ids,
+  and system-rendered copy only — never a candidate name, email, phone, or resume
+  fragment. The copy is built by the shared `buildNotification` (see *Architecture* +
+  [docs/notifications.md](docs/notifications.md)); don't pass contact fields into its
+  params.
 
 ## 3. Money is Decimal, never float
 
@@ -192,6 +197,15 @@ three invariant-rich areas**, which live in `packages/core` as pure domain logic
 NestJS services orchestrate and persist; `core` owns the invariants. Don't spread
 aggregates, repositories, domain events, or bounded contexts across the CRUD parts
 — that's overhead the MVP doesn't need. Keep the domain layer to these three.
+
+**Notifications are a cross-cutting CRUD primitive, not a fourth aggregate.** A
+single workspace-scoped in-app feed every module emits into — raise one through
+`NotificationsService.emit` (API) or the shared pure `buildNotification` +
+`prisma.notification.create` (worker), so both sides produce the byte-identical
+shape. In-app only for v1 (no email/push). Worker triggers emit **inside the
+exactly-once state transition** they key off, so they don't double-fire. Copy is
+**counts/ids only — never PII (§2)**. No event bus, no `packages/core` model. See
+[docs/notifications.md](docs/notifications.md).
 
 ---
 

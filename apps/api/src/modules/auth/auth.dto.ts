@@ -13,12 +13,15 @@ import type {
   DeleteAccountInput,
   ForgotPasswordInput,
   GoogleAuthInput,
+  RequestMagicLinkInput,
   ResetPasswordInput,
+  SignupInput,
   ThemePreference,
   TourProgress,
   TwoFactorLoginInput,
   TwoFactorVerifyInput,
   UpdateProfileInput,
+  VerifyMagicLinkInput,
 } from "@hiredesq/shared";
 
 // No workspaceId in any auth body — signup creates one; later requests carry it
@@ -27,7 +30,7 @@ import type {
 // The allowed theme values, kept in sync with ThemePreference (validated below).
 const THEMES: ThemePreference[] = ["light", "dark", "system"];
 
-export class SignupDto {
+export class SignupDto implements SignupInput {
   @IsEmail()
   email!: string;
 
@@ -43,6 +46,13 @@ export class SignupDto {
   @IsString()
   @MaxLength(200)
   workspaceName!: string;
+
+  // Browser-detected IANA timezone (e.g. "Asia/Dubai"). Optional; bounded length.
+  // Used to seed the timezone preference and derive a default country at signup.
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  timezone?: string;
 }
 
 export class LoginDto {
@@ -62,6 +72,13 @@ export class GoogleAuthDto implements GoogleAuthInput {
   @IsString()
   @IsNotEmpty()
   code!: string;
+
+  // Browser-detected IANA timezone (e.g. "Asia/Dubai"). Optional; only used when
+  // this Google sign-in CREATES a new account (seeds timezone + default country).
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  timezone?: string;
 }
 
 // DTOs `implement` the shared *Input contracts so a renamed/retyped field fails
@@ -83,6 +100,12 @@ export class UpdateProfileDto implements UpdateProfileInput {
   @IsString()
   @MaxLength(64)
   timezone?: string;
+
+  // ISO 3166-1 alpha-2 country code (e.g. "AE"). Nullable — an empty string clears it.
+  @IsOptional()
+  @IsString()
+  @MaxLength(2)
+  country?: string | null;
 
   // ISO 4217 currency code (e.g. "USD"). Three letters.
   @IsOptional()
@@ -149,4 +172,15 @@ export class ResetPasswordDto implements ResetPasswordInput {
   @MinLength(8)
   @MaxLength(200)
   newPassword!: string;
+}
+
+export class RequestMagicLinkDto implements RequestMagicLinkInput {
+  @IsEmail()
+  email!: string;
+}
+
+export class VerifyMagicLinkDto implements VerifyMagicLinkInput {
+  @IsString()
+  @IsNotEmpty()
+  token!: string;
 }

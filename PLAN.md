@@ -20,8 +20,8 @@ console — that is ops tooling outside v1, built only when real tenants exist).
 **Shipped / solid**
 - Schema — [schema.prisma](packages/database/prisma/schema.prisma): tenancy,
   credits (account + ledger), candidate (encrypted PII), job, application,
-  placement, uploads, parse_job, import_batch, duplicate_suggestion; tenant-scoped
-  indexes, `Decimal(14,2)` money, idempotency uniques.
+  placement, uploads, parse_job, import_batch, duplicate_suggestion, notification;
+  tenant-scoped indexes, `Decimal(14,2)` money, idempotency uniques.
 - Domain core — [credit-ledger.ts](packages/core/src/credit/credit-ledger.ts),
   [money.ts](packages/core/src/money/money.ts),
   [identity.ts](packages/core/src/candidate/identity.ts) (dedup).
@@ -107,6 +107,26 @@ this is a **correctness fix**, not an enhancement — tracked as **R2** below.
 > upgrade invitation wired live; DB/search/jobs/revenue stay ungated. 68/68 tests.
 > (Stripe checkout + plan-tier flip remain when payments are wanted. Reset boundary
 > is UTC for v1 — revisit for local-timezone resets.)
+
+## Phase 6 — Notifications (cross-cutting primitive + first trigger)  ✅ DONE (triggers 2–3 gated → R7)
+
+> Shipped 2026-06-26. A **reusable in-app notification primitive** any module emits
+> into — *the* systematic delivery path, built as pragmatic NestJS CRUD (no
+> domain-event bus, no `packages/core` aggregate; tactical DDD stays the three §
+> areas). `Notification` model (workspace-scoped, nullable `userId` for seat-targeting
+> later, `type`/`title`/`body`/`data` JSON, `readAt`), expand-only migrations
+> (`add_notifications` + `notification_feed_index`). Shared `buildNotification()` pure
+> renderer so API `emit()` and the worker produce one byte-identical shape (one
+> contract, §). `notifications` API module — full guard stack, `@RequirePermission(_,
+> "notification")`, list (`?unreadOnly`) / unread-count / mark-read / mark-all-read,
+> cross-tenant negative test. Web: `NotificationBell` in the top bar (unread badge,
+> 60s poll + refetch-on-focus, design-system tokens). **Delivery is in-app only for
+> v1** (no email/push — deliberate scope choice). `pnpm typecheck`/`lint` clean;
+> 124/124 unit tests. Tenant + migration + PII audits all clean.
+>
+> **Trigger 1 — bulk-upload-complete** ships with it: the worker emits inside the
+> exactly-once `bumpBatch` `processing→done` flip (idempotent, fires once per batch)
+> with a counts summary. Serves the §2A "I dropped 200 resumes" activation moment.
 
 ---
 
@@ -203,6 +223,29 @@ the hard, constraint-driven search.*
 - Dedicated `you@inbox.hiredesq…` address; inbound-email webhook → ingest pipeline
   (attachments + body). Reuses R4 storage + the Phase-1 parse path; routes to the
   job-centric inbound path (R3) when addressed to a position.
+
+## R7 — Notification triggers 2–3 (at-risk window + low-balance nudge)  🟠 gated on R2 / billing
+
+*Goal: extend the shipped Phase 6 primitive with the two triggers whose source
+features aren't live yet — emit through the same `NotificationsService.emit` /
+`buildNotification`, no new infra beyond a scheduled sweep.*
+
+- **Trigger 2 — at-risk placement nearing window end** (gated on **R2**): once the
+  guarantee window ships, a **daily pg-boss scheduled sweep** (the one genuinely new
+  piece of infra — pg-boss is event-triggered only today) queries `Placement` where
+  `status = at_risk AND clearsAt` falls inside an N-day window and emits per
+  placement, deduped (a sent-key so it pings once per threshold). Highest **money**
+  value — the moment to add an email channel if/when channels expand. Reconciles to
+  the placement rows (§3); reads balances/fees through `Money`, never raw.
+- **Trigger 3 — low-balance / cap-hit nudge** (gated on **billing**, §2F): **not**
+  "credits expiring" — the credit model is daily use-it-or-lose-it (Phase 5), nothing
+  accrues to expire. Emit when the balance crosses a low threshold or a parse is
+  blocked with `no_credits`, wired to the upgrade prompt (drives the §6 free→paid
+  metric). Routes through the credit aggregate (§4) — never reads a balance row
+  directly.
+- **Deferred within R7:** email/push channels, per-seat targeting (the `userId`
+  column is already there), and notification preferences — all wait until in-app +
+  the team tier justify them.
 
 ---
 

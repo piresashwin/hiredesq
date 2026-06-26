@@ -2,7 +2,9 @@ import { Injectable } from "@nestjs/common";
 import {
   MailService as CoreMailService,
   type MailSendResult,
+  type MagicLinkEmail,
   type PasswordResetEmail,
+  type WelcomeEmail,
 } from "@hiredesq/core";
 
 /**
@@ -23,5 +25,13 @@ export class MailService {
 
   sendPasswordResetEmail(email: PasswordResetEmail): Promise<MailSendResult> {
     return this.mail.sendPasswordResetEmail(email);
+  }
+
+  sendMagicLinkEmail(email: MagicLinkEmail): Promise<MailSendResult> {
+    return this.mail.sendMagicLinkEmail(email);
+  }
+
+  sendWelcomeEmail(email: WelcomeEmail): Promise<MailSendResult> {
+    return this.mail.sendWelcomeEmail(email);
   }
 }

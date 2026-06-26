@@ -19,6 +19,7 @@ import type {
   TwoFactorSetupDto,
   WorkspaceRole,
 } from "@hiredesq/shared";
+import { countryFromTimezone } from "@hiredesq/shared";
 import { Prisma } from "@hiredesq/database";
 import { workspaceKey } from "@hiredesq/storage";
 import { encryptField, decryptField } from "@hiredesq/core";
@@ -49,6 +50,8 @@ import type {
   DeleteAccountDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  RequestMagicLinkDto,
+  VerifyMagicLinkDto,
   TwoFactorLoginDto,
   TwoFactorVerifyDto,
 } from "./auth.dto.js";
@@ -68,6 +71,10 @@ const AVATAR_URL_TTL = 604_800;
 
 // Reset token: random bytes, only the SHA-256 hash is stored (§6); 1-hour expiry.
 const RESET_TTL_MS = 60 * 60 * 1000;
+
+// Magic-login token: same hash-only storage as the reset token, but shorter-lived
+// (15 min) — it mints a session, so the window to redeem a leaked link stays small.
+const MAGIC_LINK_TTL_MS = 15 * 60 * 1000;
 
 // Accepted avatar content types → file extension for the storage key.
 const AVATAR_EXTENSIONS: Record<string, string> = {
@@ -136,6 +143,7 @@ export class AuthService {
           passwordHash: hash(dto.password),
           fullName: dto.fullName,
           workspaceName: dto.workspaceName,
+          timezone: dto.timezone,
         }),
       ));
     } catch (err) {
@@ -147,6 +155,8 @@ export class AuthService {
 
     // Log ids only — never email/PII (§2).
     this.logger.log(`signup user=${user.id} ws=${workspace.id}`);
+
+    this.dispatchWelcomeEmail(user);
 
     // Build through the single AuthUserDto builder so avatarUrl/theme stay
     // consistent everywhere a user is returned. New users: avatarKey null,
@@ -199,10 +209,12 @@ export class AuthService {
           googleId: identity.googleId,
           fullName: identity.name || email,
           workspaceName: `${firstName}'s Workspace`,
+          timezone: dto.timezone,
         }),
       );
       userId = user.id;
       this.logger.log(`google-signup user=${user.id} ws=${workspace.id}`); // ids only (§2)
+      this.dispatchWelcomeEmail(user);
     }
 
     // A freshly created Google user has 2FA off; a returning user may have enabled it.
@@ -221,14 +233,24 @@ export class AuthService {
       fullName: string;
       workspaceName: string;
       googleId?: string;
+      /** Browser-detected IANA timezone; seeds the timezone pref + derived country. */
+      timezone?: string;
     },
   ) {
+    // Auto-detect signup defaults from the browser timezone: seed the timezone
+    // preference and derive a best-effort country (ISO 3166-1 alpha-2). Both are
+    // sensible defaults the recruiter can correct later in Settings. An absent or
+    // unknown zone falls through to the schema default ("UTC") with a null country.
+    const timezone = input.timezone?.trim() || undefined;
+    const country = countryFromTimezone(timezone);
     const user = await tx.user.create({
       data: {
         email: input.email,
         passwordHash: input.passwordHash,
         fullName: input.fullName,
         googleId: input.googleId,
+        timezone,
+        country,
       },
     });
     const workspace = await tx.workspace.create({ data: { name: input.workspaceName, plan: "free" } });
@@ -246,6 +268,26 @@ export class AuthService {
       },
     });
     return { user, workspace, membership };
+  }
+
+  // Best-effort welcome email, fired after the signup transaction commits.
+  // Fire-and-forget on purpose: signup must never block on (or fail because of)
+  // an external email send. Inert without RESEND_API_KEY. Logs ids only — never
+  // the recipient's email or name (§2/§6).
+  private dispatchWelcomeEmail(user: { id: string; email: string; fullName: string }): void {
+    const firstName = user.fullName.trim().split(/\s+/)[0] || undefined;
+    const appUrl = process.env.APP_URL ?? "";
+    // Deferred into the microtask chain so a *synchronous* throw (e.g. a partial
+    // test double without the method) also lands in .catch() — never on signup.
+    void Promise.resolve()
+      .then(() => this.mail.sendWelcomeEmail({ to: user.email, firstName, appUrl }))
+      .then((result) => {
+        if (result.sent) this.logger.log(`welcome email sent user=${user.id}`); // id only
+      })
+      .catch(() => {
+        // Swallow — a mail hiccup must never fail an account creation.
+        this.logger.warn(`welcome email failed user=${user.id}`); // id only, no error body (§2/§6)
+      });
   }
 
   async login(dto: LoginDto): Promise<LoginResultDto> {
@@ -319,12 +361,15 @@ export class AuthService {
       fullName?: string;
       theme?: ThemePreference;
       timezone?: string;
+      country?: string | null;
       currency?: string;
       tourProgress?: TourProgress;
     } = {};
     if (dto.fullName !== undefined) data.fullName = dto.fullName;
     if (dto.theme !== undefined) data.theme = dto.theme;
     if (dto.timezone !== undefined) data.timezone = dto.timezone;
+    // An empty string clears the country; otherwise normalize to upper-case alpha-2.
+    if (dto.country !== undefined) data.country = dto.country?.trim() ? dto.country.trim().toUpperCase() : null;
     if (dto.currency !== undefined) data.currency = dto.currency;
 
     // Tour progress is MERGED, never replaced: marking one screen seen must not
@@ -604,6 +649,69 @@ export class AuthService {
     this.logger.log(`password reset completed count=${claimed.count}`); // no ids/token (§2/§6)
   }
 
+  // ── Passwordless (magic-link) login (PUBLIC) ───────────────────────────────
+  async requestMagicLink(dto: RequestMagicLinkDto): Promise<void> {
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, fullName: true },
+    });
+
+    // ALWAYS return success — never reveal whether the email exists (no enumeration).
+    if (!user) return;
+
+    // Random token; only its SHA-256 hash is persisted (§6). The raw token lives
+    // only in the email link. Mirrors the reset flow, with a shorter TTL.
+    const rawToken = randomBytes(32).toString("hex");
+    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        loginTokenHash: tokenHash,
+        loginTokenExpiresAt: new Date(Date.now() + MAGIC_LINK_TTL_MS),
+      },
+    });
+
+    const firstName = user.fullName.trim().split(/\s+/)[0] || undefined;
+    const magicUrl = `${process.env.APP_URL ?? ""}/magic-link?token=${rawToken}`;
+    const result = await this.mail.sendMagicLinkEmail({ to: email, firstName, magicUrl });
+
+    if (!result.sent) {
+      // Dev only: no Resend key configured, so surface the link locally. Never
+      // reached in prod (RESEND_API_KEY set) — and we only log it when NOT sent (§6).
+      this.logger.log(`[dev] magic login link: ${magicUrl}`);
+    } else {
+      this.logger.log(`magic link email sent user=${user.id}`); // id only, no token/email (§2/§6)
+    }
+  }
+
+  async verifyMagicLink(dto: VerifyMagicLinkDto): Promise<LoginResultDto> {
+    const tokenHash = createHash("sha256").update(dto.token).digest("hex");
+
+    // Look up the unredeemed, unexpired link to recover the principal + their 2FA
+    // state (updateMany can't return the row).
+    const user = await this.prisma.user.findFirst({
+      where: { loginTokenHash: tokenHash, loginTokenExpiresAt: { gt: new Date() } },
+      select: { id: true, twoFactorEnabled: true },
+    });
+    if (!user) throw new BadRequestException("invalid or expired login link");
+
+    // Atomically CLAIM the token — clear it conditioned on it still matching, so a
+    // replayed or raced link can't redeem twice: the first claim nulls the hash, so a
+    // second concurrent request matches zero rows.
+    const claimed = await this.prisma.user.updateMany({
+      where: { id: user.id, loginTokenHash: tokenHash },
+      data: { loginTokenHash: null, loginTokenExpiresAt: null },
+    });
+    if (claimed.count === 0) throw new BadRequestException("invalid or expired login link");
+
+    this.logger.log(`magic-link login user=${user.id}`); // id only (§2/§6)
+    // Honour 2FA — a magic link proves email possession; an enrolled account still
+    // completes the TOTP step, identical to password/Google login.
+    return this.issueOrChallenge(user.id, user.twoFactorEnabled);
+  }
+
   // ── Avatar (user-scoped; workspaceId resolved from membership, never a body) ─
   async setAvatar(userId: string, avatar: IncomingAvatar): Promise<AuthUserDto> {
     const ext = AVATAR_EXTENSIONS[avatar.mimetype];
@@ -660,6 +768,7 @@ export class AuthService {
       avatarUrl,
       theme: (user.theme as ThemePreference) ?? "system",
       timezone: user.timezone ?? "UTC",
+      country: user.country ?? null,
       currency: user.currency ?? "USD",
       twoFactorEnabled: user.twoFactorEnabled ?? false,
       tourProgress: sanitizeTourProgress(user.tourProgress),

@@ -28,6 +28,8 @@ import {
   DeleteAccountDto,
   ForgotPasswordDto,
   ResetPasswordDto,
+  RequestMagicLinkDto,
+  VerifyMagicLinkDto,
   TwoFactorLoginDto,
   TwoFactorVerifyDto,
 } from "./auth.dto.js";
@@ -160,6 +162,21 @@ export class AuthController {
   @HttpCode(204)
   resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
     return this.auth.resetPassword(dto);
+  }
+
+  // PUBLIC — request a passwordless login link. Always 204, never reveals whether
+  // the email exists (no enumeration), exactly like forgot-password.
+  @Post("magic-link/request")
+  @HttpCode(204)
+  requestMagicLink(@Body() dto: RequestMagicLinkDto): Promise<void> {
+    return this.auth.requestMagicLink(dto);
+  }
+
+  // PUBLIC — redeem the emailed login token. Returns tokens, OR — when the account
+  // has 2FA enabled — a challenge to complete at /auth/login/2fa (same union as login).
+  @Post("magic-link/verify")
+  verifyMagicLink(@Body() dto: VerifyMagicLinkDto): Promise<LoginResultDto> {
+    return this.auth.verifyMagicLink(dto);
   }
 
   // Multipart avatar upload (field "file"). Reuses the @fastify/multipart pattern

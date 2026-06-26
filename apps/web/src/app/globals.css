@@ -207,6 +207,29 @@
   animation: checkPop 260ms ease-out both;
 }
 
+/* Skeleton shimmer — a token-colored gradient sweeping across loading bars.
+   Reads as "data incoming" (vs. a pulse). Theme-aware via the tokens; degrades
+   to a static bar under reduced-motion (the block below kills the iteration). */
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--color-subtle)) 25%,
+    rgb(var(--color-line)) 50%,
+    rgb(var(--color-subtle)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
