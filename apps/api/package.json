@@ -1,0 +1,37 @@
+{
+  "name": "@hiredesq/api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "dotenv -e ../../.env -- nest start --watch",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@fastify/multipart": "^8.3.0",
+    "@hiredesq/ai": "workspace:*",
+    "@hiredesq/core": "workspace:*",
+    "@hiredesq/database": "workspace:*",
+    "@hiredesq/shared": "workspace:*",
+    "@hiredesq/storage": "workspace:*",
+    "@nestjs/common": "^10.4.0",
+    "@nestjs/core": "^10.4.0",
+    "@nestjs/platform-fastify": "^10.4.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "google-auth-library": "^9.14.0",
+    "otplib": "^13.4.1",
+    "pg-boss": "^10.1.5",
+    "qrcode": "^1.5.4",
+    "reflect-metadata": "^0.2.2",
+    "stripe": "^17.0.0"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.4.0",
+    "@types/node": "^20.14.0",
+    "@types/qrcode": "^1.5.6",
+    "dotenv-cli": "^8.0.0",
+    "typescript": "^5.6.0"
+  }
+}

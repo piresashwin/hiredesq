@@ -1,0 +1,33 @@
+{
+  "name": "@hiredesq/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "dotenv -e ../../.env -- tsx watch src/main.ts",
+    "backfill:embeddings": "dotenv -e ../../.env -- tsx src/backfill-embeddings.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test src/*.test.ts"
+  },
+  "dependencies": {
+    "@hiredesq/ai": "workspace:*",
+    "@hiredesq/core": "workspace:*",
+    "@hiredesq/database": "workspace:*",
+    "@hiredesq/shared": "workspace:*",
+    "@hiredesq/storage": "workspace:*",
+    "mammoth": "^1.8.0",
+    "papaparse": "^5.4.1",
+    "pdf-parse": "^1.1.1",
+    "pg-boss": "^10.1.5",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/papaparse": "^5.3.15",
+    "@types/pdf-parse": "^1.1.4",
+    "dotenv-cli": "^8.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

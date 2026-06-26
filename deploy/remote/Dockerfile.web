@@ -1,0 +1,19 @@
+# Thin image wrapping the rsynced release/web/ folder.
+# Build context = release/web (set in docker-compose.prod.yml).
+# release/web is produced by `pnpm deploy --prod` (full prod node_modules +
+# apps/web source) plus the .next/ build output copied alongside.
+FROM node:20-alpine
+
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+COPY . .
+
+ENV NODE_ENV=production \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
+
+EXPOSE 3000
+
+# next start, via the local CLI installed by pnpm deploy.
+CMD ["node_modules/.bin/next", "start", "-p", "3000", "-H", "0.0.0.0"]

@@ -1,0 +1,131 @@
+# Production stack for hiredesq.
+# Run from $DEPLOY_PATH on the droplet:
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+#
+# Services:
+#   api       NestJS api (internal 3001)
+#   worker    pg-boss worker — the CV-parse pipeline (no ports)
+#   web       Next.js (internal 3000)
+#
+# SHARED infrastructure (NOT in this stack — owned by tradex on the same droplet):
+#   - Postgres: api + worker connect to tradex's `tradex-postgres` container over
+#     the `edge` net, to a SEPARATE `hiredesq` database + role inside it (single
+#     role; RLS deferred — CLAUDE.md §1). pg-boss lives in this same DB — no Redis.
+#     The DB URL host is the CONTAINER NAME `tradex-postgres`, not the service
+#     alias `postgres` (which would collide with tradex's own on `edge`).
+#   - TLS + reverse proxy: the shared tradex nginx fronts hiredesq.com; web + api
+#     join `edge` so it can reach them by container name. See deploy/README.md.
+
+services:
+  api:
+    build:
+      context: ./release/api
+      dockerfile: ../../Dockerfile.api
+    container_name: hiredesq-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: ${DATABASE_URL}
+      # Direct connection (no pooler) — used for migrations and the pg-boss queue.
+      DIRECT_URL: ${DIRECT_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY}
+      JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      APP_URL: ${APP_URL}
+      API_URL: ${API_URL}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_REGION: ${S3_REGION}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      # Embeddings — semantic candidate search (§5).
+      VOYAGER_API_KEY: ${VOYAGER_API_KEY}
+      EMBEDDINGS_MODEL: ${EMBEDDINGS_MODEL}
+      # Forwarding inbox — Cloudflare Email Worker → POST /api/inbound/email (F9).
+      INBOX_DOMAIN: ${INBOX_DOMAIN}
+      INBOUND_WEBHOOK_SECRET: ${INBOUND_WEBHOOK_SECRET}
+      # Stripe billing (§4, F8).
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_TEAM_PRICE_ID: ${STRIPE_TEAM_PRICE_ID}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      # Transactional email (Resend) — password-reset links.
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RESEND_FROM: ${RESEND_FROM}
+    # No `depends_on` for the DB — Postgres is the external tradex-postgres
+    # container, not a service in this compose project. Prisma retries the
+    # connection on boot if the DB is briefly unreachable.
+    # `hiredesq` = private net for internal service-name calls (web→api);
+    # `edge` = shared net to reach tradex-nginx (proxy) and tradex-postgres (DB).
+    networks: [hiredesq, edge]
+
+  worker:
+    build:
+      context: ./release/worker
+      dockerfile: ../../Dockerfile.worker
+    container_name: hiredesq-worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_REGION: ${S3_REGION}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      # Embeddings — the worker embeds candidates after parse (§5).
+      VOYAGER_API_KEY: ${VOYAGER_API_KEY}
+      EMBEDDINGS_MODEL: ${EMBEDDINGS_MODEL}
+    # No DB `depends_on` (external tradex-postgres). The worker needs `edge` to
+    # reach tradex-postgres for both the data and the pg-boss queue.
+    networks: [hiredesq, edge]
+
+  web:
+    build:
+      context: ./release/web
+      dockerfile: ../../Dockerfile.web
+    container_name: hiredesq-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      # SSR fetches to /api/* are rewritten via this internal URL.
+      INTERNAL_API_URL: http://api:3001
+      # Public-facing API base used by client-side code. The shared nginx serves
+      # the API under /api on the same origin (it strips the prefix before the api
+      # container, which has no global prefix). NB: browser calls use the value
+      # baked at build time (build.sh) — this runtime value only affects SSR.
+      NEXT_PUBLIC_API_URL: ${APP_URL}/api
+    depends_on:
+      - api
+    networks: [hiredesq, edge]
+
+# NOTE: no nginx / certbot here by design. TLS termination + reverse proxy is the
+# shared tradex nginx (it owns :80/:443 on this droplet). hiredesq registers a
+# vhost by dropping nginx-vhosts/hiredesq.com.conf into /srv/nginx-vhosts (mounted
+# into the tradex nginx) and its cert is issued by the shared certbot. See
+# deploy/deploy.sh and deploy/README.md. Adding an nginx here would collide on
+# :80/:443 with the tradex proxy.
+
+networks:
+  # Private stack network — used for hiredesq's internal service-name resolution
+  # (web→api via http://api:3001) so it never relies on `edge`, where the `api`
+  # alias collides with tradex's.
+  hiredesq:
+    name: hiredesq
+  # Shared network owned by the tradex stack. Created once on the droplet
+  # (`docker network create edge`); declared external so this stack joins it
+  # rather than defining it. Carries both the proxy (tradex-nginx → hiredesq-web/
+  # -api) and the DB (api/worker → tradex-postgres).
+  edge:
+    external: true
+    name: edge
+
+# No volumes — hiredesq owns no stateful container. Its data lives in the shared
+# tradex-postgres instance (separate `hiredesq` database) and in object storage.

@@ -1,0 +1,629 @@
+// hiredesq schema. Multi-tenant: every business-data row carries workspaceId.
+// App-layer isolation in v1 (RLS deferred — CLAUDE.md §1). Money is Decimal (§3).
+
+generator client {
+  provider        = "prisma-client-js"
+  // native = local dev; linux-musl = the alpine container in deploy/.
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
+  // postgresqlExtensions lets Prisma track pg_trgm (fuzzy candidate search, §5).
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  // pg_trgm powers typo-tolerant candidate search (trigram similarity + ILIKE);
+  // vector (pgvector) powers semantic search. Both ship in the pgvector/pgvector
+  // image (see docker-compose.yml).
+  extensions = [pg_trgm, vector]
+}
+
+enum PlanTier {
+  free
+  team
+}
+
+enum WorkspaceRole {
+  owner
+  member
+}
+
+enum PipelineStage {
+  sourced
+  submitted
+  interview
+  placed
+  rejected
+}
+
+enum ParseStatus {
+  queued
+  processing
+  done
+  failed
+}
+
+enum CreditEntryStatus {
+  reserved
+  committed
+  refunded
+}
+
+enum ImportBatchStatus {
+  processing
+  done
+}
+
+enum DuplicateStatus {
+  pending
+  confirmed
+  dismissed
+}
+
+// Client-ready submission lifecycle (MVP-SPEC §2D). [Launch] uses `sent`; the
+// V1.1 client-feedback loop (F5) advances through the rest and auto-nudges stage.
+enum SubmissionStatus {
+  sent
+  viewed
+  advance
+  interview
+  reject
+}
+
+// Placement guarantee lifecycle (MVP-SPEC §2E, CLAUDE.md §3). A fee is `at_risk`
+// until the guarantee window clears; a fall-through `fell_through` reverses it; a
+// no-new-fee replacement marks the original `replaced` and carries its fee forward.
+enum PlacementStatus {
+  at_risk
+  cleared
+  fell_through
+  replaced
+}
+
+// Per-candidate qualification trail entry kind (MVP-SPEC §2C, F4). `note` is a plain
+// observation; qualified/disqualified record an explicit in/out decision vs the req.
+enum TrailEntryKind {
+  note
+  qualified
+  disqualified
+}
+
+// Workspace-configurable custom candidate field types. `select` carries a fixed
+// option list; `boolean` is a yes/no; the rest store their natural value as text.
+enum CustomFieldType {
+  text
+  number
+  date
+  select
+  boolean
+}
+
+// ─────────────────────────── Tenancy ───────────────────────────
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  plan      PlanTier @default(free)
+  // Forwarding inbox (§2A, F9): the unguessable local-part of this workspace's
+  // ingest address (<inboxToken>@inbox.hiredesq.com). The address IS a capability —
+  // anyone who knows it can forward CVs into this workspace — so it's random and
+  // rotatable. Null until first requested (lazily minted).
+  inboxToken String?  @unique @map("inbox_token")
+  // Stripe billing (§4/§6, F8). Maps this workspace to its Stripe customer +
+  // subscription so the webhook can flip `plan` free↔team. Null until first checkout.
+  // Stripe owns the money; we store only the linking ids (never card data).
+  stripeCustomerId     String? @unique @map("stripe_customer_id")
+  stripeSubscriptionId String? @map("stripe_subscription_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  memberships          Membership[]
+  creditAccount        CreditAccount?
+  candidates           Candidate[]
+  jobs                 Job[]
+  placements           Placement[]
+  uploads              UploadedFile[]
+  parseJobs            ParseJob[]
+  importBatches        ImportBatch[]
+  duplicateSuggestions DuplicateSuggestion[]
+  submissions          Submission[]
+  qualificationTrail   QualificationTrailEntry[]
+  notes                Note[]
+  upgradeInterest      UpgradeInterest?
+  customFieldDefs      CustomFieldDefinition[]
+
+  @@map("workspace")
+}
+
+// A workspace-configured custom field shown on every candidate (Settings → Candidate
+// fields). Definitions are workspace-scoped config; the per-candidate VALUES live in
+// Candidate.customFields (a JSON map keyed by this row's id), so renaming a label or
+// reordering never orphans stored data. `options` is used only by `select`.
+model CustomFieldDefinition {
+  id          String          @id @default(cuid())
+  workspaceId String          @map("workspace_id")
+  label       String
+  type        CustomFieldType @default(text)
+  options     String[]        @default([])
+  // Ascending display order on the candidate's Personal-details tab.
+  order       Int             @default(0)
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, order])
+  @@map("custom_field_definition")
+}
+
+// Captured upgrade intent (MVP-SPEC §4/§6) — no payment yet (Stripe deferred).
+// One standing record per workspace (upsert); the founder follows up.
+model UpgradeInterest {
+  id          String   @id @default(cuid())
+  workspaceId String   @unique @map("workspace_id")
+  userId      String?  @map("user_id")
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("upgrade_interest")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  // Null for users who only ever authenticate via an external provider (Google);
+  // they can add one later via the forgot-password flow. Email/password users have it.
+  passwordHash String?  @map("password_hash")
+  // Google account subject (the stable `sub` from a verified ID token). Set on first
+  // Google sign-in, or when an existing email/password account is linked. Null = no Google.
+  googleId     String?  @unique @map("google_id")
+  fullName     String   @map("full_name")
+  // Profile photo — object-storage key (workspaces/<wsId>/avatars/<userId>.<ext>);
+  // never a public URL. The API hands out a short-lived signed URL (§1/§2).
+  avatarKey    String?  @map("avatar_key")
+  // UI theme preference, synced across devices. One of light | dark | system.
+  theme        String   @default("system")
+  // IANA timezone (e.g. "Asia/Dubai") for displaying dates/times, and the default
+  // currency for new jobs/placements. User-level preferences, synced across devices.
+  // These are display/prefill defaults — the authoritative money currency stays on
+  // each Job/Placement row (CLAUDE.md §3).
+  timezone     String   @default("UTC")
+  currency     String   @default("USD")
+  // Two-factor auth (TOTP). The shared secret is stored ENCRYPTED at rest
+  // (encryptField, §2/§6) and is only set once enrollment starts; `twoFactorEnabled`
+  // flips true only after the user verifies a code, and login is gated on it.
+  totpSecretEncrypted String? @map("totp_secret_encrypted")
+  twoFactorEnabled    Boolean @default(false) @map("two_factor_enabled")
+  // Per-screen guided-tour completion, synced across devices. A JSON map of
+  // TourScreen -> true once the user has finished/skipped that screen's tour
+  // (drives the "unseen" dot on the help icon). Defaults to {} for new users.
+  tourProgress Json     @default("{}") @map("tour_progress")
+  // Password reset (forgot-password flow). We store only the HASH of the reset
+  // token (never the token itself, §6) plus its expiry; both cleared on use.
+  passwordResetTokenHash String?   @map("password_reset_token_hash")
+  passwordResetExpiresAt DateTime? @map("password_reset_expires_at")
+  // First-run onboarding: when the user finished (or skipped) the welcome
+  // takeover. Null = never seen it, so the web app shows the onboarding carousel
+  // once per account. Set once, idempotently (never re-shown after).
+  onboardedAt  DateTime? @map("onboarded_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  memberships Membership[]
+
+  @@map("user")
+}
+
+model Membership {
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  userId      String        @map("user_id")
+  role        WorkspaceRole @default(member)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@map("membership")
+}
+
+// ─────────────────────────── Credits (§4) ───────────────────────────
+
+model CreditAccount {
+  id                 String    @id @default(cuid())
+  workspaceId        String    @unique @map("workspace_id")
+  balance            Int       @default(0)
+  // Free-tier DAILY allotment + when it was last granted. Lazy daily renewal:
+  // credits reset to dailyAllotment each day and do NOT roll over (§4). Under
+  // Model B (FEATURE-SET.md §F3) this DAILY meter gates SUBMISSION generation —
+  // the monetizable output — not ingest.
+  dailyAllotment     Int       @default(5) @map("daily_allotment")
+  lastGrantedAt      DateTime? @map("last_granted_at")
+  // Model B ingest meter (FEATURE-SET.md §F3): resume parsing is FREE, not drawn
+  // from the daily credits. This lifetime counter is the abuse/onboarding ceiling
+  // — a free workspace may parse up to INGEST_FREE_LIMIT (the onboarding grant)
+  // before ingest nudges an upgrade, so a backlog dump never paywalls on day 1.
+  ingestUsedLifetime Int       @default(0) @map("ingest_used_lifetime")
+
+  workspace Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  entries   CreditLedgerEntry[]
+
+  @@map("credit_account")
+}
+
+model CreditLedgerEntry {
+  id             String            @id @default(cuid())
+  accountId      String            @map("account_id")
+  workspaceId    String            @map("workspace_id")
+  // Idempotency key — the parse job's content hash. A retry reuses the entry.
+  reservationKey String            @map("reservation_key")
+  cost           Int
+  status         CreditEntryStatus @default(reserved)
+  createdAt      DateTime          @default(now()) @map("created_at")
+  settledAt      DateTime?         @map("settled_at")
+
+  account CreditAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, reservationKey])
+  @@index([accountId])
+  @@map("credit_ledger_entry")
+}
+
+// ─────────────────────────── Candidates (§2, §5) ───────────────────────────
+
+model Candidate {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+
+  fullName String @map("full_name")
+
+  // Encrypted at rest (CLAUDE.md §2). Normalized columns are for dedup matching.
+  emailEncrypted  String? @map("email_encrypted")
+  phoneEncrypted  String? @map("phone_encrypted")
+  normalizedEmail String? @map("normalized_email")
+  normalizedPhone String? @map("normalized_phone")
+  normalizedName  String  @map("normalized_name")
+
+  location       String?
+  currentTitle   String?  @map("current_title")
+  currentCompany String?  @map("current_company")
+  skills         String[]
+  // Experience/education kept as JSON for v1; promote to tables if queried.
+  experience     Json     @default("[]")
+  education      Json     @default("[]")
+
+  // Values for the workspace's custom fields — a JSON map of
+  // CustomFieldDefinition.id -> stringified value (boolean "true"/"false", date
+  // ISO yyyy-mm-dd, number/text/select as text). Keyed by the stable definition id
+  // so a label rename never orphans a value; unknown ids are ignored on read.
+  customFields   Json     @default("{}") @map("custom_fields")
+
+  // Hard-constraint fields for the deterministic qualification filter (§2C, F4).
+  // Parsed from the CV when present (else null/empty = unknown), and editable. The
+  // match is pure data comparison — NO AI, NO credit.
+  nationality           String?
+  residenceTransferable Boolean? @map("residence_transferable")
+  licenses              String[]
+
+  // Profile photo — object-storage key (workspaces/<wsId>/candidate-photos/<id>.<ext>);
+  // never a public URL. The API hands out a short-lived signed URL (§1/§2), and the
+  // file is removed with the candidate's other files on delete.
+  photoKey String? @map("photo_key")
+
+  // Semantic-search embedding (pgvector, §5). Unsupported = Prisma has no native
+  // vector type; it's written/read via $executeRaw/$queryRaw. Generated via Voyage
+  // (voyage-4-lite) at ingest, best-effort — null until embedded. Dim must match
+  // EMBEDDING_DIM in @hiredesq/ai. HNSW index lives in the migration (Prisma can't
+  // express vector index ops).
+  embedding Unsupported("vector(1024)")?
+
+  source    String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  workspace               Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  applications            Application[]
+  placements              Placement[]
+  submissions             Submission[]
+  notes                   Note[]
+  // Dedup review (§5): name-only matches become a suggestion, not a silent merge.
+  duplicateSuggestions    DuplicateSuggestion[] @relation("suggestionCandidate")
+  duplicateSuggestionsFor DuplicateSuggestion[] @relation("suggestionDuplicateOf")
+
+  // Dedup lookups, scoped to the workspace.
+  @@index([workspaceId, normalizedEmail])
+  @@index([workspaceId, normalizedPhone])
+  @@index([workspaceId, normalizedName])
+  // Default list/sort path: WHERE workspace_id = $1 ORDER BY created_at DESC (the
+  // candidate-DB home screen). Without this the largest tenant table seq-scans +
+  // sorts on the most-hit query (review Batch B / §1 perf).
+  @@index([workspaceId, createdAt])
+  // Fuzzy/typo-tolerant search (pg_trgm): GIN trigram indexes accelerate both the
+  // similarity (%) operator and ILIKE on the human-entered text a recruiter searches
+  // by. Tenant scoping stays in the query's workspace_id predicate (§1).
+  @@index([fullName(ops: raw("gin_trgm_ops"))], type: Gin, map: "candidate_full_name_trgm_idx")
+  @@index([currentTitle(ops: raw("gin_trgm_ops"))], type: Gin, map: "candidate_current_title_trgm_idx")
+  @@index([currentCompany(ops: raw("gin_trgm_ops"))], type: Gin, map: "candidate_current_company_trgm_idx")
+  @@map("candidate")
+}
+
+// ─────────────────────────── Jobs & pipeline ───────────────────────────
+
+model Job {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  title       String
+  client      String?
+  status      String   @default("open")
+  // The req prose (responsibilities/requirements). Feeds the job embedding for the
+  // candidate-match suggestion (§5) — richer match context than the title alone.
+  description String?
+  // Typical placement fee for the role — basis for weighted pipeline value (§3).
+  expectedFee Decimal? @map("expected_fee") @db.Decimal(14, 2)
+  currency    String   @default("USD")
+
+  // Hard constraints for the deterministic qualification filter (MVP-SPEC §2C, F4).
+  // Empty/false = no constraint. Compared against candidate fields with NO AI call
+  // and NO credit — this stays on the right side of the deferred ranking line (§3).
+  requiredNationalities         String[] @map("required_nationalities")
+  residenceTransferableRequired Boolean  @default(false) @map("residence_transferable_required")
+  requiredLicenses              String[] @map("required_licenses")
+
+  // Semantic-match embedding (pgvector, §5), SAME space as candidate.embedding so a
+  // job and a fitting candidate land near each other. Unsupported = Prisma has no
+  // native vector type; written/read via $executeRaw/$queryRaw. Generated via Voyage
+  // (voyage-4-lite) on create/update, best-effort — null until embedded. Dim must
+  // match EMBEDDING_DIM in @hiredesq/ai. HNSW index lives in the migration.
+  embedding Unsupported("vector(1024)")?
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  applications  Application[]
+  placements    Placement[]
+  submissions   Submission[]
+  importBatches ImportBatch[]
+
+  @@index([workspaceId, status])
+  @@map("job")
+}
+
+model Application {
+  id          String        @id @default(cuid())
+  workspaceId String        @map("workspace_id")
+  candidateId String        @map("candidate_id")
+  jobId       String        @map("job_id")
+  stage       PipelineStage @default(sourced)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  trail     QualificationTrailEntry[]
+  notes     Note[]
+
+  @@unique([workspaceId, candidateId, jobId])
+  @@index([workspaceId, jobId, stage])
+  @@map("application")
+}
+
+// Free-form recruiter notes on a candidate (MVP — distinct from the qualification
+// trail, which records explicit qualify/disqualify decisions §2C). applicationId
+// null = a general candidate-level note; set = scoped to a specific position (the
+// candidate's application to a job). authorId is best-effort (nullable so a note
+// survives a user delete). Body is recruiter PII-ish free text — never logged (§2).
+model Note {
+  id            String   @id @default(cuid())
+  workspaceId   String   @map("workspace_id")
+  candidateId   String   @map("candidate_id")
+  applicationId String?  @map("application_id")
+  body          String
+  authorId      String?  @map("author_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  candidate   Candidate    @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  application Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, candidateId])
+  @@map("note")
+}
+
+// ─────────────────────────── Revenue (§3) ───────────────────────────
+
+model Placement {
+  id          String @id @default(cuid())
+  workspaceId String @map("workspace_id")
+  candidateId String @map("candidate_id")
+  jobId       String @map("job_id")
+
+  feeAmount Decimal  @map("fee_amount") @db.Decimal(14, 2)
+  currency  String   @default("USD")
+  placedAt  DateTime @map("placed_at")
+
+  // Guarantee/replacement window (MVP-SPEC §2E, §3): the fee is at-risk until the
+  // window clears. clearsAt = placedAt + guaranteeDays, computed at create time.
+  guaranteeDays       Int             @default(30) @map("guarantee_days")
+  clearsAt            DateTime        @map("clears_at")
+  status              PlacementStatus @default(at_risk)
+  // On a fall-through, the amount of the original fee RETAINED (a pro-rated refund
+  // keeps part; a full reversal keeps nothing). Recognized as earned; the rest is
+  // reversed. Null until/unless the placement falls through. Decimal, never float (§3).
+  retainedAmount      Decimal?        @map("retained_amount") @db.Decimal(14, 2)
+  // No-new-fee replacement: points at the placement this one replaces. The
+  // replacement CARRIES the original fee (not a second charge); the original flips
+  // to `replaced`, so revenue counts the fee exactly once across the chain.
+  replacesPlacementId String?         @map("replaces_placement_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  workspace  Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  candidate  Candidate   @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job        Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  replaces   Placement?  @relation("PlacementReplacement", fields: [replacesPlacementId], references: [id], onDelete: SetNull)
+  replacedBy Placement[] @relation("PlacementReplacement")
+
+  @@index([workspaceId, placedAt])
+  @@index([workspaceId, status])
+  @@map("placement")
+}
+
+// ─────────────────────────── Ingest & parsing (§5) ───────────────────────────
+
+model UploadedFile {
+  id          String   @id @default(cuid())
+  workspaceId String   @map("workspace_id")
+  // Object-storage key, namespaced by workspace: workspaces/<id>/...
+  storageKey  String   @map("storage_key")
+  kind        String // pdf | docx | image | text
+  contentHash String   @map("content_hash")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parseJobs ParseJob[]
+
+  @@unique([workspaceId, contentHash])
+  @@map("uploaded_file")
+}
+
+model ParseJob {
+  id          String      @id @default(cuid())
+  workspaceId String      @map("workspace_id")
+  fileId      String?     @map("file_id")
+  // Idempotency: the parse job is keyed by content hash (matches the credit
+  // reservation key). A re-enqueue of the same content is a no-op.
+  contentHash String      @map("content_hash")
+  status      ParseStatus @default(queued)
+  error       String?
+  // Set when status becomes `done` — lets the ingest UI poll then reveal the
+  // resulting candidate (design-system §8 parse reveal). Not a FK: the candidate
+  // may later be merged/deleted; this is a best-effort pointer.
+  candidateId String?     @map("candidate_id")
+  // Set when this parse is part of a bulk drop (folder/CSV) — lets the progress
+  // view aggregate (§2A bulk import).
+  batchId     String?     @map("batch_id")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  file      UploadedFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  batch     ImportBatch?  @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, contentHash])
+  @@index([workspaceId, status])
+  @@index([workspaceId, batchId])
+  @@map("parse_job")
+}
+
+// A bulk drop (a folder of resumes / a CSV / an Excel sheet). Tracks aggregate
+// progress so the UI can show "reading 12 resumes… 11 done, 1 duplicate".
+model ImportBatch {
+  id          String            @id @default(cuid())
+  workspaceId String            @map("workspace_id")
+  source      String // bulk_import | csv | xlsx | folder
+  status      ImportBatchStatus @default(processing)
+  total       Int               @default(0)
+  done        Int               @default(0)
+  failed      Int               @default(0)
+  duplicates  Int               @default(0)
+  // Job-centric inbound (§2A, F7): the open position this drop was aimed at, so its
+  // candidates land attached to the req. Null = the global pool. SetNull on job delete.
+  jobId       String?           @map("job_id")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  job       Job?       @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  parseJobs ParseJob[]
+
+  @@index([workspaceId, status])
+  @@map("import_batch")
+}
+
+// Dedup review (§5). Email/phone hits auto-merge; a NAME-ONLY hit is recorded
+// here for the recruiter to confirm or dismiss — a name collision is not proof
+// of the same person, so we never silently merge on it.
+model DuplicateSuggestion {
+  id            String          @id @default(cuid())
+  workspaceId   String          @map("workspace_id")
+  candidateId   String          @map("candidate_id") // the newly ingested record
+  duplicateOfId String          @map("duplicate_of_id") // the existing record it may match
+  matchedOn     String // "name"
+  status        DuplicateStatus @default(pending)
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  candidate   Candidate @relation("suggestionCandidate", fields: [candidateId], references: [id], onDelete: Cascade)
+  duplicateOf Candidate @relation("suggestionDuplicateOf", fields: [duplicateOfId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, candidateId, duplicateOfId])
+  @@index([workspaceId, status])
+  @@map("duplicate_suggestion")
+}
+
+// ─────────────────────── Client-ready submission (§2D, Wedge 2) ───────────────────────
+
+// A clean, branded, CONTACT-MASKED profile generated from a candidate — the
+// first same-day monetizable deliverable. The AI generates only the summary prose
+// (through the credit gate, §4); masking is a DETERMINISTIC post-step (§2/§5) — the
+// model is never trusted to redact. `maskedProfile` is a point-in-time snapshot so
+// a sent submission never changes when the candidate is later edited; it holds NO
+// raw contact data (email/phone are stripped, not stored here).
+model Submission {
+  id          String           @id @default(cuid())
+  workspaceId String           @map("workspace_id")
+  candidateId String           @map("candidate_id")
+  // Optional job link — the [Launch] pool-only path leaves this null; the V1.1
+  // job-linked path (F5) sets it and writes the qualification trail.
+  jobId       String?          @map("job_id")
+  status      SubmissionStatus @default(sent)
+
+  // AI-generated branded summary prose (Haiku, structured output, credit-gated).
+  summary       String
+  // The masked, client-facing profile snapshot (JSON). Contact details removed (§2).
+  maskedProfile Json   @map("masked_profile")
+  // Stable, unguessable token for the shareable client link — NEVER the row id (§1).
+  shareToken    String @unique @map("share_token")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job       Job?      @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, candidateId])
+  // Job-scoped lookups (F5 "submissions for this job" panel): WHERE workspace_id
+  // = $1 AND job_id = $2. Mostly-null today (pool-only), needed before F5 ships.
+  @@index([workspaceId, jobId])
+  @@map("submission")
+}
+
+// ─────────────────────── Qualification trail (§2C, F4) ───────────────────────
+
+// One structured note per candidate-per-position (the application) capturing WHY a
+// candidate is in or out against the req — the backbone of a long, hard search.
+// Tenant-scoped (§1); plain text, no AI.
+model QualificationTrailEntry {
+  id            String         @id @default(cuid())
+  workspaceId   String         @map("workspace_id")
+  applicationId String         @map("application_id")
+  kind          TrailEntryKind @default(note)
+  note          String
+  // The user who recorded it (best-effort; nullable so an entry survives user delete).
+  authorId      String?        @map("author_id")
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, applicationId])
+  @@map("qualification_trail_entry")
+}

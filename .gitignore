@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.next/
+.turbo/
+release/
+release.prev/
+*.tsbuildinfo
+
+# secrets — never commit
+.env
+.env.*
+!.env.example
+deploy/.env.deploy
+
+# prisma generated client
+packages/database/generated/
+
+# os / editor
+.DS_Store
+
+# marketing — internal content plans, never commit
+marketing/

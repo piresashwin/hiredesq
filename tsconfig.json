@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  // Root config used only by repo-root tooling that resolves a tsconfig from the
+  // working directory (notably `tsx --test` in the `test:unit` script). Each package
+  // extends tsconfig.base.json directly for its own build/typecheck, so this file
+  // does not affect those. It enables the decorator transform so node:test specs can
+  // import NestJS services (parameter decorators like @Inject) — e.g. the auth specs.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  }
+}

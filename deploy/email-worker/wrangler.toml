@@ -1,0 +1,13 @@
+name = "hiredesq-inbox"
+main = "worker.js"
+compatibility_date = "2026-06-25"
+
+# The API endpoint the parsed email is POSTed to. The API is served path-based at
+# hiredesq.com/api (shared tradex nginx strips /api → hiredesq-api:3001), not a
+# subdomain — so the inbound webhook is /api/inbound/email.
+[vars]
+API_INBOUND_URL = "https://hiredesq.com/api/inbound/email"
+
+# Secret (set via: wrangler secret put INBOUND_WEBHOOK_SECRET) — MUST equal the API's
+# INBOUND_WEBHOOK_SECRET env. Never commit the value.
+# INBOUND_WEBHOOK_SECRET = "<set as a secret, not here>"

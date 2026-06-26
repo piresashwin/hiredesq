@@ -1,0 +1,218 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Design tokens (the single source of truth — Tailwind maps these in
+   tailwind.config.ts). Values are space-separated RGB channels so Tailwind's
+   `/<alpha>` modifiers work. Brand = calm teal-green; accent = terracotta.
+   See docs/design-system.md.
+   Dark mode is a [data-theme="dark"] override of these same vars (below), never
+   a second palette — every component reads the tokens, so it adapts for free.
+   ──────────────────────────────────────────────────────────────────────── */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* surfaces & text (warm neutrals) */
+  --color-ink: 26 26 46; /* #1a1a2e  text-strong */
+  --color-canvas: 247 246 243; /* #f7f6f3  app background */
+  --color-surface: 255 255 255; /* #ffffff  cards / tables */
+  --color-subtle: 240 238 233; /* #f0eee9  section bg / hover row */
+  --color-line: 228 225 218; /* #e4e1da  hairlines / borders */
+  --color-muted: 107 107 120; /* #6b6b78  metadata / labels */
+  --color-faint: 163 163 173; /* #a3a3ad  placeholder / disabled */
+
+  /* brand — teal-green */
+  --color-brand: 47 111 94; /* #2f6f5e */
+  --color-brand-hover: 37 90 76; /* #255a4c */
+  --color-brand-tint: 233 241 238; /* #e9f1ee  selected rows, AI chips */
+  --color-brand-fg: 255 255 255;
+  --color-accent: 224 122 95; /* #e07a5f  terracotta */
+
+  /* semantic — money IS the brand green */
+  --color-money: 47 111 94; /* #2f6f5e */
+  --color-success: 47 111 94;
+  --color-success-tint: 233 241 238;
+  --color-warning: 193 122 53; /* #c17a35  low credits / low-confidence */
+  --color-warning-tint: 250 242 230; /* #faf2e6 */
+  --color-danger: 192 57 43; /* #c0392b  delete PII / hard error */
+  --color-danger-tint: 251 234 231; /* #fbeae7 */
+  --color-info: 63 124 146; /* #3f7c92  neutral / AI-processing */
+
+  /* pipeline stages — read as progression; Placed = money green, Rejected = muted */
+  --color-stage-sourced: 138 135 130; /* warm stone — just entered */
+  --color-stage-submitted: 63 124 146; /* blue — in motion to client */
+  --color-stage-interview: 224 122 95; /* terracotta — heating up */
+  --color-stage-placed: 47 111 94; /* brand green — the win */
+  --color-stage-rejected: 168 162 158; /* muted — closed, not alarming */
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Dark theme — same tokens, eye-friendly values. Deep warm slate (never pure
+   black), soft off-white text (never pure white), and a brighter teal so brand
+   still reads on the dark canvas. Tints become dark-tinted so chips/rows stay
+   subtle. Applied via [data-theme="dark"] on <html> (synced to the account).
+   ──────────────────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* surfaces & text */
+  --color-ink: 230 231 238; /* soft off-white */
+  --color-canvas: 21 23 28; /* deep warm slate */
+  --color-surface: 28 31 37; /* raised cards / tables */
+  --color-subtle: 37 41 48; /* section bg / hover row */
+  --color-line: 49 54 63; /* hairlines / borders */
+  --color-muted: 151 154 164; /* metadata / labels */
+  --color-faint: 104 108 118; /* placeholder / disabled */
+
+  /* brand — brighter teal for contrast on dark; dark fg on the bright fill */
+  --color-brand: 90 173 148; /* #5aad94 */
+  --color-brand-hover: 110 190 165;
+  --color-brand-tint: 31 48 43; /* dark teal tint — selected rows, AI chips */
+  --color-brand-fg: 13 20 17; /* near-black green — text on brand fills */
+  --color-accent: 232 146 120; /* terracotta */
+
+  /* semantic */
+  --color-money: 90 173 148;
+  --color-success: 90 173 148;
+  --color-success-tint: 31 48 43;
+  --color-warning: 214 158 92;
+  --color-warning-tint: 53 44 30;
+  --color-danger: 230 120 110;
+  --color-danger-tint: 58 35 33;
+  --color-info: 110 170 192;
+
+  /* pipeline stages */
+  --color-stage-sourced: 150 146 140;
+  --color-stage-submitted: 110 170 192;
+  --color-stage-interview: 232 146 120;
+  --color-stage-placed: 90 173 148;
+  --color-stage-rejected: 130 126 122;
+}
+
+@layer base {
+  body {
+    @apply bg-canvas text-ink antialiased;
+  }
+
+  /* Money, counts, dates: tabular figures so columns align (§7). */
+  .nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Visible focus everywhere — never strip the outline without a replacement. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand/40 ring-offset-1 ring-offset-canvas;
+  }
+
+  ::selection {
+    @apply bg-brand/15;
+  }
+
+  /* Subtle, themed scrollbars — the default chunky OS bars spoil dense panels
+     (the candidate drawer, tables). Thin track-less bars in the `line` token that
+     darken on hover; adapt to dark mode for free via the var. Reserve gutter space
+     so content doesn't reflow when a bar appears. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--color-line)) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--color-line));
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(var(--color-muted) / 0.6);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Motion (§8). The budget is small: 120–160ms ease-out for chrome; the parse
+   reveal is the one place we invest. All keyframes are gated behind motion-safe
+   utilities at the call site, and the block below hard-disables animation under
+   prefers-reduced-motion so the parse reveal degrades to an instant fill.
+   ──────────────────────────────────────────────────────────────────────── */
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes popIn {
+  from {
+    transform: scale(0.97);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* The parse-reveal field populate: a quick rise + fade as each field lands. */
+@keyframes revealField {
+  from {
+    transform: translateY(4px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.reveal-field {
+  animation: revealField 220ms ease-out both;
+}
+
+/* The soft check that lands when a candidate finishes parsing. */
+@keyframes checkPop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.check-pop {
+  animation: checkPop 260ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,0 +1,13 @@
+# Thin image wrapping the rsynced release/worker/ folder (the CV-parse pipeline).
+# Build context = release/worker (set in docker-compose.prod.yml).
+FROM node:20-alpine
+
+RUN apk add --no-cache openssl libc6-compat
+WORKDIR /app
+
+COPY . .
+
+ENV NODE_ENV=production
+
+# pg-boss worker process — no ports exposed.
+CMD ["node", "dist/main"]

@@ -1,0 +1,407 @@
+{
+  "summary": "Deep research harness — fan-out web searches, fetch sources, adversarially verify claims, synthesize a cited report.",
+  "agentCount": 103,
+  "logs": [
+    "Q: Competitive landscape and market analysis for AI-powered recruitment platforms t…",
+    "Decomposed into 5 angles: broad/competitor landscape, freemium/monetization & self-serve, AI features table-stakes vs differentiator, practitioner pain points / gaps, pricing benchmarks & market size",
+    "broad/competitor landscape: 6 results",
+    "practitioner pain points / gaps: 6 results",
+    "practitioner pain points / gaps: 5 novel (1 filtered)",
+    "pricing benchmarks & market size: 6 results",
+    "pricing benchmarks & market size: 4 novel (2 filtered)",
+    "AI features table-stakes vs differentiator: 6 results",
+    "AI features table-stakes vs differentiator: 4 novel (2 filtered)",
+    "freemium/monetization & self-serve: 6 results",
+    "freemium/monetization & self-serve: 2 novel (4 filtered)",
+    "Fetched 21 sources → 94 claims → verifying top 25",
+    "\"Ashby positions itself as enterprise recruiting so…\": 2-1 ✓",
+    "[stall] agent \"v2:Loxo offers a permanently free tier ($0 \" stalled (no progress) after 195s — retrying (1/5)",
+    "[stall] agent \"v0:Loxo's paid Basic plan costs $169 per us\" stalled (no progress) after 195s — retrying (1/5)",
+    "[stall] agent \"v1:Loxo's paid Basic plan costs $169 per us\" stalled (no progress) after 195s — retrying (1/5)",
+    "[stall] agent \"v1:Loxo offers a permanently free tier ($0 \" stalled (no progress) after 196s — retrying (1/5)",
+    "[stall] agent \"v0:Loxo offers a permanently free tier ($0 \" stalled (no progress) after 197s — retrying (1/5)",
+    "[stall] agent \"v2:Loxo's paid Basic plan costs $169 per us\" stalled (no progress) after 194s — retrying (1/5)",
+    "[stall] agent \"v0:Loxo embeds AI features including Natura\" stalled (no progress) after 203s — retrying (1/5)",
+    "[stall] agent \"v1:Loxo embeds AI features including Natura\" stalled (no progress) after 195s — retrying (1/5)",
+    "\"Loxo offers a permanently free tier ($0 forever) f…\": 3-0 ✓",
+    "\"Loxo's paid Basic plan costs $169 per user/month (…\": 3-0 ✓",
+    "\"Loxo embeds AI features including Natural Language…\": 3-0 ✓",
+    "\"Zoho Recruit offers a free-forever plan limited to…\": 3-0 ✓",
+    "\"Manatal targets SMBs and offers only a 14-day tria…\": 3-0 ✓",
+    "\"Recruiting software pricing for small businesses (…\": 3-0 ✓",
+    "[stall] agent \"v1:Recruit CRM targets small employment age\" stalled (no progress) after 257s — retrying (1/5)",
+    "[stall] agent \"v1:Jobin.cloud offers a free-forever plan a\" stalled (no progress) after 197s — retrying (1/5)",
+    "[stall] agent \"v2:Jobin.cloud offers a free-forever plan a\" stalled (no progress) after 197s — retrying (1/5)",
+    "[stall] agent \"v0:Jobin.cloud offers a free-forever plan a\" stalled (no progress) after 201s — retrying (1/5)",
+    "[stall] agent \"v0:Zoho Recruit and Recruit CRM offer free \" stalled (no progress) after 207s — retrying (1/5)",
+    "[stall] agent \"v2:Zoho Recruit and Recruit CRM offer free \" stalled (no progress) after 205s — retrying (1/5)",
+    "\"Freemium is one of six recognized pricing models i…\": 3-0 ✓",
+    "[stall] agent \"v0:The global recruitment software market w\" stalled (no progress) after 193s — retrying (1/5)",
+    "[stall] agent \"v1:Recruit CRM targets small employment age\" stalled (no progress) after 214s — retrying (2/5)",
+    "[stall] agent \"v0:Jobin.cloud offers a free-forever plan a\" stalled (no progress) after 193s — retrying (2/5)",
+    "[stall] agent \"v1:Jobin.cloud offers a free-forever plan a\" stalled (no progress) after 196s — retrying (2/5)",
+    "[stall] agent \"v2:Jobin.cloud offers a free-forever plan a\" stalled (no progress) after 204s — retrying (2/5)",
+    "[stall] agent \"v0:Zoho Recruit and Recruit CRM offer free \" stalled (no progress) after 204s — retrying (2/5)",
+    "[stall] agent \"v2:Zoho Recruit and Recruit CRM offer free \" stalled (no progress) after 202s — retrying (2/5)",
+    "[stall] agent \"v1:The global recruitment software market w\" stalled (no progress) after 193s — retrying (1/5)",
+    "\"Zoho Recruit and Recruit CRM offer free plans, whi…\": 0-3 ✗",
+    "[stall] agent \"v0:The global recruitment software market w\" stalled (no progress) after 194s — retrying (2/5)",
+    "[stall] agent \"v0:Jobin.cloud offers a free-forever plan a\" stalled (no progress) after 196s — retrying (3/5)",
+    "[stall] agent \"v1:Jobin.cloud offers a free-forever plan a\" stalled (no progress) after 197s — retrying (3/5)",
+    "[stall] agent \"v1:Recruit CRM targets small employment age\" stalled (no progress) after 211s — retrying (3/5)",
+    "[stall] agent \"v2:Jobin.cloud offers a free-forever plan a\" stalled (no progress) after 197s — retrying (3/5)",
+    "[stall] agent \"v1:The global recruitment software market w\" stalled (no progress) after 193s — retrying (2/5)",
+    "\"Recruit CRM targets small employment agencies and …\": 3-0 ✓",
+    "[stall] agent \"v2:The global recruitment software market w\" stalled (no progress) after 873s — retrying (1/5)",
+    "[stall] agent \"v0:The recruitment software market is proje\" stalled (no progress) after 864s — retrying (1/5)",
+    "[stall] agent \"v0:The global recruitment software market w\" stalled (no progress) after 807s — retrying (3/5)",
+    "[stall] agent \"v0:Jobin.cloud offers a free-forever plan a\" stalled (no progress) after 746s — retrying (4/5)",
+    "[stall] agent \"v1:Jobin.cloud offers a free-forever plan a\" stalled (no progress) after 744s — retrying (4/5)",
+    "[stall] agent \"v2:Jobin.cloud offers a free-forever plan a\" stalled (no progress) after 734s — retrying (4/5)",
+    "[stall] agent \"v1:The global recruitment software market w\" stalled (no progress) after 711s — retrying (3/5)",
+    "[stall] agent \"v1:The recruitment software market is proje\" stalled (no progress) after 693s — retrying (1/5)",
+    "\"The global recruitment software market was valued …\": 3-0 ✓",
+    "\"The recruitment software market is projected to gr…\": 3-0 ✓",
+    "[stall] agent \"v0:Jobin.cloud offers a free-forever plan a\" stalled (no progress) after 381s — retrying (5/5)",
+    "[stall] agent \"v1:Jobin.cloud offers a free-forever plan a\" stalled (no progress) after 384s — retrying (5/5)",
+    "[stall] agent \"v1:The global recruitment software market i\" stalled (no progress) after 190s — retrying (1/5)",
+    "[stall] agent \"v0:The global recruitment software market i\" stalled (no progress) after 191s — retrying (1/5)",
+    "[stall] agent \"v2:The global recruitment software market i\" stalled (no progress) after 191s — retrying (1/5)",
+    "[stall] agent \"v0:The SME segment is the fastest-growing o\" stalled (no progress) after 189s — retrying (1/5)",
+    "[stall] agent \"v1:The SME segment is the fastest-growing o\" stalled (no progress) after 197s — retrying (1/5)",
+    "[stall] agent \"v2:The SME segment is the fastest-growing o\" stalled (no progress) after 194s — retrying (1/5)",
+    "[stall] agent \"v1:The global recruitment software market i\" stalled (no progress) after 191s — retrying (2/5)",
+    "[stall] agent \"v0:The global recruitment software market i\" stalled (no progress) after 192s — retrying (2/5)",
+    "[stall] agent \"v2:The global recruitment software market i\" stalled (no progress) after 193s — retrying (2/5)",
+    "parallel[0] failed: agent stalled on all 6 attempts (no progress for 180000ms each)",
+    "parallel[1] failed: agent stalled on all 6 attempts (no progress for 180000ms each)",
+    "\"Jobin.cloud offers a free-forever plan aimed at so…\": 0-1 (2 abstain) ✗",
+    "[stall] agent \"v0:The SME segment is the fastest-growing o\" stalled (no progress) after 196s — retrying (2/5)",
+    "[stall] agent \"v1:The SME segment is the fastest-growing o\" stalled (no progress) after 195s — retrying (2/5)",
+    "[stall] agent \"v2:The SME segment is the fastest-growing o\" stalled (no progress) after 194s — retrying (2/5)",
+    "\"Entry-level/freemium recruitment software packages…\": 0-3 ✗",
+    "[stall] agent \"v1:The global recruitment software market i\" stalled (no progress) after 193s — retrying (3/5)",
+    "[stall] agent \"v0:The global recruitment software market i\" stalled (no progress) after 195s — retrying (3/5)",
+    "[stall] agent \"v2:The global recruitment software market i\" stalled (no progress) after 195s — retrying (3/5)",
+    "[stall] agent \"v0:The SME segment is the fastest-growing o\" stalled (no progress) after 196s — retrying (3/5)",
+    "[stall] agent \"v1:The SME segment is the fastest-growing o\" stalled (no progress) after 196s — retrying (3/5)",
+    "[stall] agent \"v2:The SME segment is the fastest-growing o\" stalled (no progress) after 300s — retrying (3/5)",
+    "[stall] agent \"v1:Zoho Recruit's Forever Free plan is limi\" stalled (no progress) after 261s — retrying (1/5)",
+    "[stall] agent \"v2:The global recruitment software market i\" stalled (no progress) after 218s — retrying (4/5)",
+    "[stall] agent \"v0:The global recruitment software market i\" stalled (no progress) after 218s — retrying (4/5)",
+    "[stall] agent \"v1:The global recruitment software market i\" stalled (no progress) after 222s — retrying (4/5)",
+    "[stall] agent \"v0:The SME segment is the fastest-growing o\" stalled (no progress) after 213s — retrying (4/5)",
+    "[stall] agent \"v1:The SME segment is the fastest-growing o\" stalled (no progress) after 200s — retrying (4/5)",
+    "[stall] agent \"v1:Zoho Recruit's Staffing Agency Edition i\" stalled (no progress) after 205s — retrying (1/5)",
+    "\"Zoho Recruit's Forever Free plan is limited to 1 a…\": 1-2 ✗",
+    "\"The global recruitment software market is sized at…\": 3-0 ✓",
+    "\"The SME segment is the fastest-growing organizatio…\": 2-1 ✓",
+    "\"Zoho Recruit launched eight agentic AI tools in Oc…\": 3-0 ✓",
+    "\"Recruiting CRM/ATS per-seat pricing at the small-a…\": 1-2 ✗",
+    "\"Several recruiting CRM platforms targeting small/m…\": 0-3 ✗",
+    "\"Manatal targets budget-conscious small teams and s…\": 3-0 ✓",
+    "\"Recruiting platforms differ in target segment: Rec…\": 0-3 ✗",
+    "\"Loxo offers a free-forever ATS and CRM tier and ta…\": 3-0 ✓",
+    "[stall] agent \"v2:Zoho Recruit's Staffing Agency Edition i\" stalled (no progress) after 279s — retrying (1/5)",
+    "[stall] agent \"v1:Recruit CRM is priced for global agencie\" stalled (no progress) after 204s — retrying (1/5)",
+    "\"Recruit CRM is priced for global agencies needing …\": 2-1 ✓",
+    "\"Zoho Recruit's Staffing Agency Edition is priced a…\": 3-0 ✓",
+    "Verify done: 25 claims → 18 confirmed, 7 killed"
+  ],
+  "result": {
+    "question": "Competitive landscape and market analysis for AI-powered recruitment platforms targeting solo/independent recruiters and small recruiting agencies (teams of 5-10), with a freemium model (free individual tier + paid team tier).\n\nResearch these dimensions specifically:\n1. Existing recruitment platforms (ATS, recruiting CRM, applicant tracking) that target solo recruiters and small agencies — e.g. Recruit CRM, Loxo, Crelate, Manatal, JobAdder, Zoho Recruit, Bullhorn, RecruiterFlow, Vincere, iSmartRecruit, Ceipal, Tracker, Hireflow, hiring tools like Workable, Ashby, Greenhouse (note which are NOT for small/solo). For each relevant one: target customer, pricing/tiers, free tier availability, AI features, key strengths/weaknesses.\n2. Which of these use a freemium or free-tier model (Zoho Recruit free plan, etc.) and how they monetize. How \"easy to start\" / self-serve onboarding is positioned.\n3. Where AI is being applied in recruiting today (resume parsing, candidate matching/ranking, sourcing, outreach email generation, interview scheduling, candidate Q&A, job description writing, chrome extensions for sourcing from LinkedIn). Which features are table-stakes vs differentiators in 2025-2026.\n4. The pain points of small/independent recruiters: data scattered across WhatsApp/Excel/Google Drive, time spent on admin, lack of context on past placements, no revenue visibility. What tools claim to solve these and gaps that remain.\n5. Pricing benchmarks: typical per-seat/month pricing for recruiting CRM/ATS at the small-agency level, and what free tiers include.\n6. Market size and trends for recruitment software / recruiting CRM, especially the SMB / independent recruiter segment.",
+    "summary": "The market for AI-powered recruitment software is large and growing — roughly USD 3.4-3.8 billion in 2025-2026, projected to reach USD 5.5-7.5 billion by 2031-2034 at an ~8-9% CAGR — with the SME/small-agency segment as the fastest-growing organization-size cohort (~10% CAGR) even though large enterprises still account for the majority (~61%) of current spending. The freemium-plus-paid-team model the question describes is validated and occupied: Loxo and Zoho Recruit are the clearest precedents, both offering genuine free-forever individual tiers and self-serve paid upgrades, while Recruit CRM and Manatal compete on the same small-agency turf but with trial-only (no free-forever) onboarding. AI features (resume parsing, natural-language/semantic candidate search, candidate matching/ranking, AI outreach/email generation, AI notetakers, sourcing/screening bots, and Chrome extensions for LinkedIn sourcing) have rapidly become table-stakes in 2025-2026 — Loxo and Zoho both bundle agentic AI at no extra cost — meaning AI alone is no longer a differentiator. Pricing benchmarks for small agencies cluster at $15-$200/user/month, with Manatal anchoring the low end ($15) and Loxo/Recruit CRM in the $85-$169 mid-range; free tiers are deliberately constrained (Loxo = 1 user; Zoho = 1 active job, 256MB). Enterprise ATS players (Ashby, Greenhouse, Lever) explicitly do not serve solo/small recruiters, leaving the freemium SMB lane to specialized recruiting-CRM vendors.",
+    "findings": [
+      {
+        "claim": "Loxo is the strongest direct precedent for the freemium-individual + paid-team model: a permanently free $0 tier for 1 user (full ATS, Recruiting CRM, Loxo Boost, unlimited jobs, Chrome extension), upgrading to a paid Basic plan at $169/user/month (annual) that adds Sales CRM, multiple users, analytics, resume parsing, and reporting. It targets executive search firms and small agencies and bundles extensive AI.",
+        "confidence": "high",
+        "vote": "3-0 (merged from claims 1, 2, 16; also 7)",
+        "evidence": "Loxo's own pricing page confirms a '$0 Forever' tier for 1 user including ATS, Recruiting CRM, Loxo Boost, unlimited jobs/projects, and Chrome extension; the paid Basic plan is $169/user/month (annual) adding Sales CRM, job-board posting, multiple users, custom dashboards, analytics, resume parsing, and reporting. Corroborated by G2, iSmartRecruit, Pin, SaaSworthy, Capterra. Target is executive search/small agencies (Loxo's own 'Executive search firms / Direct hire / Staffing agencies' language; the 'under 25 recruiters' threshold is a blog characterization, not Loxo's own).",
+        "sources": [
+          "https://www.loxo.co/pricing",
+          "https://spott.io/resources/top-10-ats-and-crm-platforms-for-recruiting-agencies-in-2026",
+          "https://www.selectsoftwarereviews.com/blog/recruitment-software-pricing"
+        ]
+      },
+      {
+        "claim": "Loxo embeds a broad, current AI feature set across tiers: Natural Language (semantic) Search, an AI Notetaker, three named AI agents (Self-Updating CRM Agent, Contact-Info Finding Agent, Candidate Submittal Agent), AI Job Matching/Recommendations, and Loxo Outreach (GPT-powered email/drip campaigns).",
+        "confidence": "high",
+        "vote": "3-0 (claim 3)",
+        "evidence": "Loxo's pricing/product pages confirm all named features verbatim (Natural Language Search 'plain text' candidate search, AI Notetaker auto-capturing interview notes, the three named agents, AI Job Matching, and Loxo Outreach for personalized emails/drip campaigns). Corroborated by 2025 PRWeb/StaffingHub press releases and Loxo's dedicated AI product pages. Minor naming nuance: pricing page says 'Loxo Outreach' while other materials say 'Outreach GPT'.",
+        "sources": [
+          "https://www.loxo.co/pricing"
+        ]
+      },
+      {
+        "claim": "Zoho Recruit is the other clear freemium precedent: a free-forever plan limited to 1 active job and 256MB storage, with self-serve paid tiers starting at $25/recruiter/month. Its Staffing Agency Edition is tiered $25 (Standard, 100 jobs) / $50 (Professional, 250 jobs) / $75 (Enterprise, 750 jobs) per user/month.",
+        "confidence": "high",
+        "vote": "3-0 (merged from claims 4, 13)",
+        "evidence": "Zoho's official pricing page confirms a 'Forever Free' plan with 1 active job/recruiter license; secondary sources (pin.com, avahr, SelectSoftware) confirm the 256MB free-tier storage cap and $25/user/month Standard entry. The distinct Staffing Agency Edition is priced $25/$50/$75 per user/month (100/250/750 active jobs) per pin.com, G2, SaaSworthy, PeopleManagingPeople, Klearskill — convergent across 5+ sources (annual billing).",
+        "sources": [
+          "https://www.selectsoftwarereviews.com/buyer-guide/free-recruiting-software",
+          "https://www.pin.com/blog/zoho-recruit-pricing/"
+        ]
+      },
+      {
+        "claim": "Zoho Recruit launched eight agentic AI tools in October 2025 — including a Sourcing Bot, Screening Bot, and AI-powered candidate assessments — available on paid (Professional/Enterprise) tiers at no additional cost; Free and Standard plans include no AI tools.",
+        "confidence": "high",
+        "vote": "3-0 (claim 14)",
+        "evidence": "Pin blog plus independent trade press (SmallBizTrends, CompleteAITraining) confirm eight agentic AI features launched ~Oct 20-21, 2025 (Sourcing Bot, Screening Bot, AI-assisted assessment generation, candidate/job matches, etc.) at no extra cost to existing paid users. Search snippet confirms Standard and Free plans include no AI tools; AI is gated to Professional ($50) and Enterprise ($75) tiers.",
+        "sources": [
+          "https://www.pin.com/blog/zoho-recruit-pricing/"
+        ]
+      },
+      {
+        "claim": "Manatal targets budget-conscious small teams and solo recruiters at the low end of the market: paid tiers at $15 (Professional), $35 (Enterprise), $55 (Enterprise Plus) per user/month (annual), with AI-powered candidate filtering/recommendations and enrichment built in — but only a 14-day free trial (no credit card), NOT a free-forever plan.",
+        "confidence": "high",
+        "vote": "3-0 (merged from claims 6, 15; also 7)",
+        "evidence": "Manatal's own pricing page confirms Professional $15 / Enterprise $35 / Enterprise Plus $55 per user/month (annual; monthly is $4 higher per tier), a 14-day free trial with no credit card, explicitly 'no free-forever plan,' and AI Recommendations + AI Candidate Enrichment across plans. Corroborated by G2, TrustRadius, ITQlick, PeopleManagingPeople, Pin, AvaHR. $15 is the cheapest published entry price in the small-agency segment.",
+        "sources": [
+          "https://www.selectsoftwarereviews.com/buyer-guide/free-recruiting-software",
+          "https://spott.io/resources/top-10-ats-and-crm-platforms-for-recruiting-agencies-in-2026"
+        ]
+      },
+      {
+        "claim": "Recruit CRM targets small/global employment agencies needing invoicing and revenue tracking, priced at $85 (Pro) / $125 (Business) / $165 (Enterprise) per user/month billed annually. It offers an unlimited free trial (one sequence, one pipeline) rather than a free-forever plan.",
+        "confidence": "high",
+        "vote": "3-0 (merged from claims 5, 17)",
+        "evidence": "RecruitCompare, iSmartRecruit, PeopleManagingPeople, and TrustRadius confirm Pro $85 / Business $125 / Enterprise $165 per user/month (annual; Capterra shows higher monthly-billed rates ~$100/$150/$165). Recruit CRM's own site confirms an 'unlimited free trial' with usage limits and no credit card (a trial, not freemium); the entry Pro plan is limited to 1 sequence and 1 pipeline. Targets recruitment agencies (10-200 employees) with invoicing/revenue features. Note: SSR imprecisely labeled the 1-sequence/1-pipeline limit a 'free tier' — it is actually the entry Pro paid plan.",
+        "sources": [
+          "https://www.selectsoftwarereviews.com/buyer-guide/free-recruiting-software",
+          "https://spott.io/resources/top-10-ats-and-crm-platforms-for-recruiting-agencies-in-2026"
+        ]
+      },
+      {
+        "claim": "Ashby (and by extension Greenhouse/Lever-class platforms) explicitly target large organizations and are NOT suitable for solo recruiters or 5-10 person agencies; Ashby's smallest tier starts at ~$400/month for orgs up to 100 employees.",
+        "confidence": "medium",
+        "vote": "2-1 (claim 0)",
+        "evidence": "Ashby's own /enterprise page states 'Enterprise-grade recruiting software... Built to support large organizations with sophisticated hiring needs,' featuring logos like Shopify and Snowflake. Independent reviews (pin.com, costbench, research.com) confirm the smallest 'Foundations' tier starts ~$400/month for up to 100 employees, with company-size-based tiering roughly double Greenhouse/Lever — structurally unsuitable for solo/small agencies. Caveat: Ashby also serves startups/scale-ups, not only giant enterprises, which is why the vote was 2-1.",
+        "sources": [
+          "https://www.ashbyhq.com/enterprise"
+        ]
+      },
+      {
+        "claim": "Freemium is one of six recognized recruitment-software pricing models (alongside subscription, pay-per-user, tiered, custom, and free/open-source); among lower-cost ATS/CRM tools, free tiers exist at Zoho Recruit, Recruit CRM, Loxo, and Breezy HR.",
+        "confidence": "high",
+        "vote": "3-0 (claim 8)",
+        "evidence": "SelectSoftwareReviews (2026) names exactly six models: subscription-based, pay-per-user, tiered, custom, free/open-source, freemium. Corroborated by Software Advice, PeopleManagingPeople, Manatal. Freemium vendor examples verified (Zoho 'freemium model'; Loxo 'Free Forever'; Recruit CRM and Breezy HR listed with free plans). Caveat: the taxonomy is informal, not a formal industry standard.",
+        "sources": [
+          "https://www.selectsoftwarereviews.com/blog/recruitment-software-pricing"
+        ]
+      },
+      {
+        "claim": "Small-agency recruiting software pricing (under 50 employees) ranges roughly $15-$200 per user/month, with Manatal cheapest (~$15) and Loxo's paid Basic in the mid-range (~$119-$169). Free tiers are deliberately constrained (Loxo = 1 user; Zoho = 1 active job + 256MB).",
+        "confidence": "high",
+        "vote": "3-0 (claim 7; corroborated by 1, 4, 6, 15)",
+        "evidence": "SelectSoftwareReviews confirms the $15-$200/user/month range for sub-50-employee firms and names Manatal at $15 and Loxo at $119. Independently corroborated by G2, TrustRadius, augtal (2026) — Loxo Basic ranges $119-$169 depending on billing, plus a free 1-user tier; Zoho free = 1 active job/256MB. The $15 floor reflects annual billing.",
+        "sources": [
+          "https://www.selectsoftwarereviews.com/blog/recruitment-software-pricing",
+          "https://www.loxo.co/pricing"
+        ]
+      },
+      {
+        "claim": "The global recruitment software market is sized at roughly USD 3.4-3.8 billion in 2025-2026 and is projected to reach USD 5.5-7.5 billion by 2031-2034, growing at an ~7.85-8.95% CAGR.",
+        "confidence": "high",
+        "vote": "3-0 (merged from claims 9, 10, 11)",
+        "evidence": "Fortune Business Insights: USD 3.41B (2025) -> 3.74B (2026) -> 7.48B (2034) at 8.95% CAGR. Mordor Intelligence: USD 3.77B (2026) -> 5.5B (2031) at 7.85% CAGR (internally consistent: 3.77B compounded at 7.85% over 5yrs ~= 5.51B). Cross-firm estimates vary (2025 baselines USD 2.2-7.84B; CAGRs 4.8-9.86%) due to differing market definitions, but the two cited firms sit within the consensus 7-10% band. These are analyst estimates, not primary fact.",
+        "sources": [
+          "https://www.fortunebusinessinsights.com/industry-reports/recruitment-software-market-100081",
+          "https://www.mordorintelligence.com/industry-reports/recruitment-software-market"
+        ]
+      },
+      {
+        "claim": "The SME segment is the fastest-growing organization-size segment in recruitment software (~10.23% CAGR through 2031), outpacing large enterprises — even though large enterprises still hold the majority (~60.95%) of 2025 spending. Modular, seat-based pricing is cited as lowering the entry barrier for SMEs.",
+        "confidence": "medium",
+        "vote": "2-1 (claim 12)",
+        "evidence": "Mordor Intelligence states SME demand is 'the fastest-growing cohort' at 10.23% CAGR by 2031, while large enterprises bring 60.95% of 2025 revenue, attributing SME growth to 'modular, seat-based pricing [that] lowers the entry barrier.' Directional finding (SMEs fastest-growing, enterprises dominant in current spend) corroborated by MarketResearchFuture, Coherent, SkyQuest. Caveat: the exact 60.95% figure is firm-specific (others cite 52.6-54.3%); single secondary source for the precise CAGR.",
+        "sources": [
+          "https://www.mordorintelligence.com/industry-reports/recruitment-software-market"
+        ]
+      }
+    ],
+    "caveats": "Several findings rest on secondary sources and vendor pages rather than independent primary research. (1) Market-size and CAGR figures (findings on market size and SME growth) are commercial analyst estimates that vary widely across firms (2025 baselines from USD 2.2B to 7.84B); they should be cited as 'per Fortune Business Insights / Mordor Intelligence,' not absolute fact. The SME-growth finding (claim 12) and the Ashby positioning finding (claim 0) were 2-1 split votes and carry lower confidence. (2) Pricing is highly time-sensitive and billing-dependent: most low headline prices ($15 Manatal, $85 Recruit CRM, $169 Loxo) reflect annual billing; monthly billing runs higher, and vendors change prices frequently — all figures are current as of 2026 only. (3) The 'under 25 recruiters' Loxo target and Recruit CRM's '1 sequence/1 pipeline as free tier' were source characterizations with minor imprecision (the latter is actually the entry Pro paid plan, since Recruit CRM has no free-forever plan). (4) Importantly, several pain-point and competitor claims were REFUTED in verification and are NOT reflected here: a recruiterflow.com-sourced competitor-segmentation and free-tier roster (covering Crelate, Tracker, Top Echelon, Bullhorn, Vincere, JobAdder, PCRecruiter, Salesforce) failed adversarial voting (0-3), as did claims about Jobin.cloud's free plan, BambooHR/Recruitee freemium pricing, and the exact Zoho free-plan feature exclusions. Treat any platform not explicitly confirmed above (notably Crelate, JobAdder, Bullhorn, Vincere, RecruiterFlow, Tracker, Ceipal, iSmartRecruit, Workable, Greenhouse) as UNVERIFIED in this synthesis.",
+    "openQuestions": [
+      "The pain points of small/independent recruiters (data scattered across WhatsApp/Excel/Google Drive, admin time burden, lack of placement context, no revenue visibility) were a core research dimension but NO claim on them survived verification — what tools specifically claim to solve these and what gaps remain is unresolved and needs dedicated primary research.",
+      "Which AI features are genuinely table-stakes versus differentiators in 2025-2026 is only partially answered: resume parsing, semantic search, candidate matching, AI outreach, and notetakers appear common across Loxo and Zoho, but no source ranked or benchmarked feature ubiquity across the full competitor set.",
+      "The competitive positioning and free-tier/pricing of many named platforms (Crelate, JobAdder, Bullhorn, Vincere, RecruiterFlow, Tracker, Ceipal, iSmartRecruit, Workable, Greenhouse) remains unverified — the recruiterflow.com-sourced data was refuted, leaving gaps that primary vendor-page verification could fill.",
+      "How self-serve onboarding/'easy to start' is positioned and measured (e.g., time-to-first-value, no-credit-card trials vs free-forever conversion) was not directly substantiated beyond noting trial-vs-freemium distinctions."
+    ],
+    "refuted": [
+      {
+        "claim": "Jobin.cloud offers a free-forever plan aimed at solo recruiters that includes LinkedIn sourcing, a CRM with 10,000 contacts, 15 daily LinkedIn messages, 100 daily emails, and 30 free ChatGPT-powered AI prompts, but only a single ATS pipeline.",
+        "vote": "0-1",
+        "source": "https://www.selectsoftwarereviews.com/buyer-guide/free-recruiting-software"
+      },
+      {
+        "claim": "Zoho Recruit and Recruit CRM offer free plans, while most mid-to-enterprise ATS platforms (Workable, Ashby, Greenhouse, Lever, Teamtailor) do not — Zoho Recruit starts at $25/mo, Recruit CRM at $40-85/mo, and both also offer free trials.",
+        "vote": "0-3",
+        "source": "https://www.selectsoftwarereviews.com/blog/recruitment-software-pricing"
+      },
+      {
+        "claim": "Entry-level/freemium recruitment software packages from vendors like BambooHR and Recruitee start at around USD 50 per user per month, giving small (10-person) teams access to AI ranking and automated outreach.",
+        "vote": "0-3",
+        "source": "https://www.mordorintelligence.com/industry-reports/recruitment-software-market"
+      },
+      {
+        "claim": "Zoho Recruit's Forever Free plan is limited to 1 active job, 256MB storage, and 5 email templates, and excludes resume parsing, AI tools, sourcing, custom fields, reporting, and integrations.",
+        "vote": "1-2",
+        "source": "https://www.pin.com/blog/zoho-recruit-pricing/"
+      },
+      {
+        "claim": "Recruiting CRM/ATS per-seat pricing at the small-agency level ranges roughly $15-$124/user/month, with Manatal at $15, Salesforce at $25, Zoho Recruit at $30, Top Echelon at $89, Recruit CRM at $99, Crelate at $110, and Recruiterflow at $119 per user/month.",
+        "vote": "1-2",
+        "source": "https://recruiterflow.com/blog/best-recruitment-crm-software/"
+      },
+      {
+        "claim": "Several recruiting CRM platforms targeting small/medium firms offer a free tier or free trial, including Recruit CRM, Zoho Recruit, Manatal, Crelate, Tracker, and Top Echelon; while Recruiterflow, Bullhorn, Vincere, PCRecruiter, and JobAdder do not.",
+        "vote": "0-3",
+        "source": "https://recruiterflow.com/blog/best-recruitment-crm-software/"
+      },
+      {
+        "claim": "Recruiting platforms differ in target segment: Recruiterflow targets retained/contingent/executive search firms, Recruit CRM targets small-medium firms, Vincere targets small recruitment businesses, Manatal targets mid-size companies, and Bullhorn targets mid-size to large agencies.",
+        "vote": "0-3",
+        "source": "https://recruiterflow.com/blog/best-recruitment-crm-software/"
+      }
+    ],
+    "sources": [
+      {
+        "url": "https://www.pin.com/blog/zoho-recruit-pricing/",
+        "quality": "blog",
+        "angle": "broad/competitor landscape",
+        "claimCount": 5
+      },
+      {
+        "url": "https://recruiterflow.com/blog/best-recruitment-crm-software/",
+        "quality": "blog",
+        "angle": "broad/competitor landscape",
+        "claimCount": 5
+      },
+      {
+        "url": "https://spott.io/resources/top-10-ats-and-crm-platforms-for-recruiting-agencies-in-2026",
+        "quality": "blog",
+        "angle": "broad/competitor landscape",
+        "claimCount": 5
+      },
+      {
+        "url": "https://www.metaview.ai/resources/blog/recruitment-agency-software",
+        "quality": "blog",
+        "angle": "broad/competitor landscape",
+        "claimCount": 5
+      },
+      {
+        "url": "https://www.ashbyhq.com/enterprise",
+        "quality": "primary",
+        "angle": "broad/competitor landscape",
+        "claimCount": 5
+      },
+      {
+        "url": "https://www.hiretruffle.com/blog/ai-recruiting-software-pricing-guide",
+        "quality": "blog",
+        "angle": "broad/competitor landscape",
+        "claimCount": 5
+      },
+      {
+        "url": "https://www.loxo.co/pricing",
+        "quality": "primary",
+        "angle": "freemium/monetization & self-serve",
+        "claimCount": 4
+      },
+      {
+        "url": "https://www.selectsoftwarereviews.com/buyer-guide/free-recruiting-software",
+        "quality": "secondary",
+        "angle": "freemium/monetization & self-serve",
+        "claimCount": 5
+      },
+      {
+        "url": "https://incruiter.com/blog/ai-in-recruitment-2026-trends-stats-what-works/",
+        "quality": "blog",
+        "angle": "AI features table-stakes vs differentiator",
+        "claimCount": 5
+      },
+      {
+        "url": "https://www.pin.com/blog/ai-recruiting-agents/",
+        "quality": "blog",
+        "angle": "AI features table-stakes vs differentiator",
+        "claimCount": 5
+      },
+      {
+        "url": "https://recruiterflow.com/blog/ai-screening-tools/",
+        "quality": "blog",
+        "angle": "AI features table-stakes vs differentiator",
+        "claimCount": 5
+      },
+      {
+        "url": "https://recruitersforge.com/recruit-crm-vs-manatal-vs-loxo/",
+        "quality": "unreliable",
+        "angle": "AI features table-stakes vs differentiator",
+        "claimCount": 0
+      },
+      {
+        "url": "https://augtal.com/blog/candidate-tracking-software-7-tools-that-wont-break-your-budget/",
+        "quality": "blog",
+        "angle": "practitioner pain points / gaps",
+        "claimCount": 5
+      },
+      {
+        "url": "https://www.bullhorn.com/blog/applicant-tracking-system-for-small-recruiting-agencies/",
+        "quality": "blog",
+        "angle": "practitioner pain points / gaps",
+        "claimCount": 5
+      },
+      {
+        "url": "https://augtal.com/blog/recruiting-crm-software-showdown-5-tools-under-200-month/",
+        "quality": "blog",
+        "angle": "practitioner pain points / gaps",
+        "claimCount": 5
+      },
+      {
+        "url": "https://prepzo.ai/blog/recruiterflow-pricing",
+        "quality": "blog",
+        "angle": "practitioner pain points / gaps",
+        "claimCount": 5
+      },
+      {
+        "url": "https://www.fugo.ai/blog/crm-for-recruitment-13-options-prices-best-practices/",
+        "quality": "blog",
+        "angle": "practitioner pain points / gaps",
+        "claimCount": 5
+      },
+      {
+        "url": "https://www.selectsoftwarereviews.com/blog/recruitment-software-pricing",
+        "quality": "secondary",
+        "angle": "pricing benchmarks & market size",
+        "claimCount": 5
+      },
+      {
+        "url": "https://peoplemanagingpeople.com/recruitment/recruiting-software-pricing/",
+        "quality": "unreliable",
+        "angle": "pricing benchmarks & market size",
+        "claimCount": 0
+      },
+      {
+        "url": "https://www.fortunebusinessinsights.com/industry-reports/recruitment-software-market-100081",
+        "quality": "secondary",
+        "angle": "pricing benchmarks & market size",
+        "claimCount": 5
+      },
+      {
+        "url": "https://www.mordorintelligence.com/industry-reports/recruitment-software-market",
+        "quality": "secondary",
+        "angle": "pricing benchmarks & market size",
+        "claimCount": 5
+      }
+    ],
+    "stats": {
+      "angles": 5,
+      "sourcesFetched": 21,
+      "claimsExtracted": 94,
+      "claimsVerified": 25,
+      "confirmed": 18,
+      "killed": 7,
+      "afterSynthesis": 11,
+      "urlDupes": 5,
+      "budgetDropped": 4,
+      "agentCalls": 103
+    }
+  }
+}

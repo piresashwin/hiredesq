@@ -1,0 +1,16 @@
+{
+  "name": "hiredesq-inbox-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "secret": "wrangler secret put INBOUND_WEBHOOK_SECRET"
+  },
+  "dependencies": {
+    "postal-mime": "^2.7.5"
+  },
+  "devDependencies": {
+    "wrangler": "^4.105.0"
+  }
+}
