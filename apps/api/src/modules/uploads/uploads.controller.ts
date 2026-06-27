@@ -48,6 +48,11 @@ export class UploadsController {
     // Job-centric inbound (§2A, F7): ?jobId targets a position; verified in-tenant
     // in the service. Comes via query (the multipart body carries the files).
     @Query("jobId") jobId: string | undefined,
+    // Client-chunked folder drop: the web client splits a big folder into
+    // byte-bounded requests. The first carries ?grouped=1 to force a batch; the
+    // rest carry ?batchId to append to it. Both are tenant-verified in the service.
+    @Query("batchId") batchId: string | undefined,
+    @Query("grouped") grouped: string | undefined,
   ): Promise<BulkIngestResponse> {
     if (!req.isMultipart()) {
       throw new BadRequestException("expected multipart/form-data");
@@ -69,7 +74,10 @@ export class UploadsController {
       throw new BadRequestException("no files in upload");
     }
 
-    return this.uploads.ingest(workspaceId, files, jobId);
+    return this.uploads.ingest(workspaceId, files, jobId, {
+      batchId,
+      grouped: grouped === "1" || grouped === "true",
+    });
   }
 
   // Short-lived signed URL to view an uploaded original (§2). The UploadedFile

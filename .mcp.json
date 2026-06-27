@@ -3,6 +3,10 @@
     "higgsfield": {
       "type": "http",
       "url": "https://mcp.higgsfield.ai/mcp"
+    },
+    "instagram": {
+      "command": "node",
+      "args": ["marketing/mcp/instagram-server.mjs"]
     }
   }
 }

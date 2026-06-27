@@ -82,6 +82,10 @@ export class UploadsService {
     workspaceId: string,
     files: IncomingFile[],
     jobId?: string,
+    // Client-chunked folder drop (transport only): `batchId` appends this chunk to
+    // an existing batch; `grouped` forces a fresh batch even for one file so later
+    // chunks have a batchId to join. Both keep a big folder under the request cap.
+    chunk?: { batchId?: string; grouped?: boolean },
   ): Promise<BulkIngestResponse> {
     // Job-centric inbound (§2A, F7): verify the target position is in THIS workspace
     // (§1 — never trust a body/query id) before threading it to the worker.
@@ -91,6 +95,12 @@ export class UploadsService {
         select: { id: true },
       });
       if (!targetJob) throw new NotFoundException("job not found");
+    }
+
+    // A chunk of a client-split folder is always folder semantics: append to (or
+    // create) the shared batch, never the single-resume/sheet branches.
+    if (chunk?.batchId || chunk?.grouped) {
+      return this.ingestMulti(workspaceId, files, jobId, chunk.batchId);
     }
 
     // A single CSV/XLSX is its own protocol branch regardless of count.
@@ -171,6 +181,9 @@ export class UploadsService {
     workspaceId: string,
     files: IncomingFile[],
     jobId?: string,
+    // Present when this is a follow-on chunk of a client-split folder: append to
+    // the existing batch instead of creating one (tenant-verified below, §1).
+    existingBatchId?: string,
   ): Promise<BulkIngestResponse> {
     // A multi-file folder drop is a stream of resume parses (AI) — gate it (§4).
     // Advisory: the worker reserves+refunds per file, so this just blocks the drop
@@ -179,9 +192,25 @@ export class UploadsService {
     // Detect everything up front so an unsupported file rejects before we store.
     const detected = files.map((f) => ({ file: f, detected: detectKind(f.filename, f.mimetype) }));
 
-    const batch = await this.prisma.importBatch.create({
-      data: { workspaceId, source: "folder", status: "processing", total: files.length, jobId: jobId ?? null },
-    });
+    let batch: { id: string };
+    if (existingBatchId) {
+      // Append to the batch the first chunk created. Verify it belongs to THIS
+      // workspace (§1 — never trust a query id) before growing its total.
+      const found = await this.prisma.importBatch.findFirst({
+        where: { id: existingBatchId, workspaceId },
+        select: { id: true },
+      });
+      if (!found) throw new NotFoundException("import batch not found");
+      await this.prisma.importBatch.update({
+        where: { id: found.id },
+        data: { total: { increment: files.length } },
+      });
+      batch = found;
+    } else {
+      batch = await this.prisma.importBatch.create({
+        data: { workspaceId, source: "folder", status: "processing", total: files.length, jobId: jobId ?? null },
+      });
+    }
 
     const stored: StoredFile[] = [];
     for (const { file, detected: d } of detected) {

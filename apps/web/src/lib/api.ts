@@ -283,6 +283,29 @@ async function upload<T>(path: string, form: FormData): Promise<T> {
   return (await res.json()) as T;
 }
 
+// Pack a folder drop into byte-bounded chunks for upload(). The budget sits under
+// nginx's request cap with headroom for multipart overhead; MAX_FILES stays under
+// fastify's per-request `files` limit. A file larger than the budget rides alone
+// in its own chunk (we never split a file) — fastify's per-file cap still applies.
+const UPLOAD_CHUNK_BYTES = 20 * 1024 * 1024;
+const UPLOAD_CHUNK_MAX_FILES = 100;
+function chunkFiles(files: File[]): File[][] {
+  const chunks: File[][] = [];
+  let cur: File[] = [];
+  let bytes = 0;
+  for (const file of files) {
+    if (cur.length > 0 && (bytes + file.size > UPLOAD_CHUNK_BYTES || cur.length >= UPLOAD_CHUNK_MAX_FILES)) {
+      chunks.push(cur);
+      cur = [];
+      bytes = 0;
+    }
+    cur.push(file);
+    bytes += file.size;
+  }
+  if (cur.length > 0) chunks.push(cur);
+  return chunks;
+}
+
 // ───────────────────────────── API surface ─────────────────────────────
 
 /** Narrow a login result: true when the account needs a 2FA code to finish signing in. */
@@ -405,11 +428,35 @@ export const api = {
   // Job-centric inbound (§2A, F7): when `jobId` is supplied it rides as a query
   // param (the multipart body is reserved for the files), and every candidate
   // produced auto-attaches to that job's pipeline. Omit for the global pool.
-  uploadFiles: (files: File[], jobId?: string | null): Promise<BulkIngestResponse> => {
-    const form = new FormData();
-    for (const file of files) form.append("files", file);
-    const suffix = jobId ? `/uploads?jobId=${encodeURIComponent(jobId)}` : "/uploads";
-    return upload<BulkIngestResponse>(workspacePath(suffix), form);
+  uploadFiles: async (files: File[], jobId?: string | null): Promise<BulkIngestResponse> => {
+    // The whole folder can far exceed any single-request limit (nginx caps the
+    // request *total*, fastify caps per-file). Send it as byte-bounded chunks so
+    // no one request is huge and the api never buffers the whole folder at once.
+    // The first chunk creates a server-side ImportBatch; later chunks ride its
+    // batchId so the progress view stays one batch (a single file is never split).
+    const chunks = chunkFiles(files);
+    const items: BulkIngestResponse["items"] = [];
+    let batchId: string | undefined;
+
+    for (let i = 0; i < chunks.length; i++) {
+      const params = new URLSearchParams();
+      if (jobId) params.set("jobId", jobId);
+      if (batchId) params.set("batchId", batchId);
+      // Force a batch on the first request when more chunks follow, so a lone
+      // (oversized) first file still yields a batchId for the rest to join.
+      else if (chunks.length > 1) params.set("grouped", "1");
+      const qs = params.toString();
+      const form = new FormData();
+      for (const file of chunks[i]!) form.append("files", file);
+      const res = await upload<BulkIngestResponse>(
+        workspacePath(`/uploads${qs ? `?${qs}` : ""}`),
+        form,
+      );
+      batchId ??= res.batchId;
+      items.push(...res.items);
+    }
+
+    return { batchId, items };
   },
   getImportBatch: (id: string) =>
     request<ImportBatchDto>(workspacePath(`/import-batches/${id}`)),
