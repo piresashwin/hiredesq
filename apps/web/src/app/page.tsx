@@ -214,7 +214,7 @@ function Pillar({
 //    (brand-identity.md). The "after" cards are seeded demo data — no real PII.
 function ChaosToStructure() {
   return (
-    <div className="relative grid grid-cols-[1fr_auto_1.2fr] items-center gap-3 sm:gap-4">
+    <div className="relative flex flex-col gap-4 sm:grid sm:grid-cols-[1fr_auto_1.2fr] sm:items-center sm:gap-4">
       {/* Left — the chaos */}
       <div className="flex flex-col gap-3">
         <MessChip className="rotate-[-3deg]">
@@ -238,9 +238,15 @@ function ChaosToStructure() {
       {/* Middle — the conversion moment (the single orange accent) */}
       <div
         aria-hidden
-        className="grid h-9 w-9 place-items-center rounded-full bg-accent text-white shadow-sm"
+        className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-accent text-white shadow-sm sm:mx-0"
       >
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <svg
+          viewBox="0 0 24 24"
+          className="h-5 w-5 rotate-90 sm:rotate-0"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+        >
           <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
