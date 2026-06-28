@@ -48,11 +48,15 @@ export class UploadsController {
     // Job-centric inbound (§2A, F7): ?jobId targets a position; verified in-tenant
     // in the service. Comes via query (the multipart body carries the files).
     @Query("jobId") jobId: string | undefined,
-    // Client-chunked folder drop: the web client splits a big folder into
-    // byte-bounded requests. The first carries ?grouped=1 to force a batch; the
-    // rest carry ?batchId to append to it. Both are tenant-verified in the service.
+    // Client-chunked folder drop (store-then-seal): the web client splits a big
+    // folder into byte-bounded requests. The first carries ?grouped=1 + the full
+    // folder count ?expectedTotal (so the batch total is fixed up front); the rest
+    // carry ?batchId to append; only the final ?sealed=1 request enqueues the parse
+    // work for the whole batch. All ids are tenant-verified in the service (§1).
     @Query("batchId") batchId: string | undefined,
     @Query("grouped") grouped: string | undefined,
+    @Query("expectedTotal") expectedTotal: string | undefined,
+    @Query("sealed") sealed: string | undefined,
   ): Promise<BulkIngestResponse> {
     if (!req.isMultipart()) {
       throw new BadRequestException("expected multipart/form-data");
@@ -74,9 +78,15 @@ export class UploadsController {
       throw new BadRequestException("no files in upload");
     }
 
+    // expectedTotal is only the PROVISIONAL total for the pre-seal progress bar — the
+    // authoritative total is reconciled from the DB at seal — so a bad value can't
+    // wedge completion. Still, only accept a positive integer; ignore anything else.
+    const parsedTotal = expectedTotal ? Number(expectedTotal) : NaN;
     return this.uploads.ingest(workspaceId, files, jobId, {
       batchId,
       grouped: grouped === "1" || grouped === "true",
+      expectedTotal: Number.isInteger(parsedTotal) && parsedTotal > 0 ? parsedTotal : undefined,
+      sealed: sealed === "1" || sealed === "true",
     });
   }
 

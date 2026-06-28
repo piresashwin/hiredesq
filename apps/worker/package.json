@@ -17,10 +17,13 @@
     "@hiredesq/database": "workspace:*",
     "@hiredesq/shared": "workspace:*",
     "@hiredesq/storage": "workspace:*",
+    "jszip": "^3.10.1",
     "mammoth": "^1.8.0",
     "papaparse": "^5.4.1",
     "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^4.7.76",
     "pg-boss": "^10.1.5",
+    "sharp": "^0.33.5",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

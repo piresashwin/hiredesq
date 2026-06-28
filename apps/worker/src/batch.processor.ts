@@ -14,6 +14,7 @@ import {
   bumpBatch,
   embedCandidatesBestEffort,
   markParseDone,
+  saveCandidatePhotoBestEffort,
   setParseStatus,
   upsertCandidate,
   type EmbedPair,
@@ -205,6 +206,8 @@ export async function settleResults(
           jobId,
         });
         toEmbed.push({ candidateId, profile: result.profile });
+        // Pull an embedded headshot → candidate photo (best-effort, never throws).
+        await saveCandidatePhotoBestEffort(workspaceId, candidateId, item.kind, item.storageKey);
         await markParseDone(workspaceId, contentHash, candidateId);
         await bumpBatch(workspaceId, batchId, { done: true, merged: outcome === "merged" });
       } catch (err) {

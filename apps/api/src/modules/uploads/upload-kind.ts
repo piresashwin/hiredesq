@@ -1,5 +1,9 @@
 import { BadRequestException } from "@nestjs/common";
-import type { UploadKind } from "@hiredesq/shared";
+import { IMAGE_MEDIA, type UploadKind } from "@hiredesq/shared";
+
+// Re-export the shared image-media helper so existing importers of this module keep
+// working; the canonical map lives in @hiredesq/shared (one contract, both sides).
+export { imageMediaType } from "@hiredesq/shared";
 
 // Map an uploaded file to a parse kind + the canonical extension used in its
 // storage key. Detection is mimetype-first, extension as a fallback (browsers
@@ -11,13 +15,6 @@ export interface DetectedKind {
   /** Content type to persist on the stored object. */
   contentType: string;
 }
-
-const IMAGE_MEDIA: Record<string, "image/jpeg" | "image/png" | "image/webp"> = {
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  webp: "image/webp",
-};
 
 export function detectKind(filename: string, mimetype: string): DetectedKind {
   const ext = (filename.split(".").pop() ?? "").toLowerCase();
@@ -62,11 +59,4 @@ export function detectKind(filename: string, mimetype: string): DetectedKind {
   }
 
   throw new BadRequestException(`unsupported upload type: ${filename}`);
-}
-
-/** Media type for an image kind, used in the ParseJobData hint for the worker. */
-export function imageMediaType(
-  ext: string,
-): "image/jpeg" | "image/png" | "image/webp" | undefined {
-  return IMAGE_MEDIA[ext];
 }

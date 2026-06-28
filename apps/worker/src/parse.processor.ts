@@ -24,9 +24,11 @@ import {
   buildNotification,
   type CandidateProfile,
   type ParseJobData,
+  type UploadKind,
 } from "@hiredesq/shared";
-import { Storage } from "@hiredesq/storage";
+import { Storage, workspaceKey } from "@hiredesq/storage";
 import { extractPdf, extractDocx, hasTextLayer, readCsv, readXlsx } from "./extract.js";
+import { extractHeadshot } from "./photo.js";
 import { mapRow } from "./csv-map.js";
 import { toSafeParseError } from "./errors.js";
 
@@ -85,6 +87,10 @@ export async function processParseJob(data: ParseJobData): Promise<{ candidateId
     select: { status: true, candidateId: true },
   });
   if (prior?.status === "done" && prior.candidateId) {
+    // Backfill the photo if a prior attempt settled `done` but crashed before the
+    // photo step (it self-guards on photoKey=null, so this is a safe no-op when the
+    // photo already exists). Keeps the idempotent replay from silently dropping it.
+    await saveCandidatePhotoBestEffort(data.workspaceId, prior.candidateId, data.kind, data.storageKey);
     return { candidateId: prior.candidateId };
   }
 
@@ -105,6 +111,10 @@ export async function processParseJob(data: ParseJobData): Promise<{ candidateId
     const { candidateId, outcome } = await upsertCandidate(data.workspaceId, profile, data.source, {
       jobId: data.jobId,
     });
+
+    // 4b. Pull an embedded headshot from the CV and save it as the candidate photo
+    //     (best-effort — never fails the parse).
+    await saveCandidatePhotoBestEffort(data.workspaceId, candidateId, data.kind, data.storageKey);
 
     // 5. Finalize done (idempotent on the done transition; the slot was reserved above).
     await markParseDone(data.workspaceId, contentHash, candidateId);
@@ -416,6 +426,48 @@ async function fetchBytes(data: ParseJobData): Promise<Buffer> {
   return getStorage().getBytes(data.workspaceId, data.storageKey);
 }
 
+/**
+ * Best-effort: pull an embedded headshot from the CV and save it as the candidate's
+ * photo. A candidate photo is PII (§2) — stored workspace-namespaced under the same
+ * `candidate-photos/<id>.<ext>` key the manual-upload path uses (so candidate delete
+ * already removes it), bytes never logged. Only DOCX / PDF carry embedded images;
+ * other kinds no-op. We never overwrite an existing photo (a manual upload or an
+ * earlier parse wins). Failures here are swallowed — extraction is an enhancement,
+ * never a reason to fail an otherwise-successful parse.
+ */
+export async function saveCandidatePhotoBestEffort(
+  workspaceId: string,
+  candidateId: string,
+  kind: UploadKind,
+  storageKey: string | undefined,
+): Promise<void> {
+  if (!storageKey || (kind !== "pdf" && kind !== "docx")) return;
+  try {
+    const existing = await prisma.candidate.findFirst({
+      where: { id: candidateId, workspaceId },
+      select: { photoKey: true },
+    });
+    if (existing?.photoKey) return; // already has a photo — don't clobber it
+
+    const bytes = await getStorage().getBytes(workspaceId, storageKey);
+    const photo = await extractHeadshot(kind, bytes);
+    if (!photo) return; // no plausible headshot embedded
+
+    const key = workspaceKey(workspaceId, "candidate-photos", `${candidateId}.jpg`);
+    await getStorage().put(workspaceId, key, photo.buffer, photo.contentType);
+    // updateMany so the workspaceId predicate is enforced (§1); `photoKey: null`
+    // makes the set idempotent and races safely with a concurrent manual upload.
+    await prisma.candidate.updateMany({
+      where: { id: candidateId, workspaceId, photoKey: null },
+      data: { photoKey: key },
+    });
+    console.warn(`[cv-parse] photo saved ws=${workspaceId} candidate=${candidateId} kind=${kind}`);
+  } catch {
+    // No PII in logs (§2) — ids only. The parse itself already succeeded.
+    console.warn(`[cv-parse] photo extract skipped ws=${workspaceId} candidate=${candidateId}`);
+  }
+}
+
 /** Drive the ParseJob row's status so the ingest UI can poll it (no PII written). */
 export async function setParseStatus(
   workspaceId: string,
@@ -458,7 +510,17 @@ export async function bumpBatch(
     });
     const batch = await tx.importBatch.findFirst({
       where: { id: batchId, workspaceId },
-      select: { total: true, done: true, failed: true, duplicates: true, jobId: true, status: true },
+      select: {
+        total: true,
+        done: true,
+        failed: true,
+        duplicates: true,
+        jobId: true,
+        status: true,
+        // True when the delayed safety net sealed this drop (the client died before the
+        // final chunk) — surfaced as a flag in the completion notification (§2, no PII).
+        partial: true,
+      },
     });
     if (batch && batch.status === "processing" && batch.done + batch.failed >= batch.total) {
       // Guard on status:"processing" so the completion transition fires exactly once.
@@ -478,6 +540,7 @@ export async function bumpBatch(
           done: batch.done,
           duplicates: batch.duplicates,
           failed: batch.failed,
+          partial: batch.partial,
         });
         await tx.notification.create({
           data: {

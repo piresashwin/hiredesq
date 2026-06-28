@@ -21,6 +21,12 @@ export interface NotificationParams {
     duplicates: number;
     /** Items that failed to parse. */
     failed: number;
+    /**
+     * True when the batch was auto-sealed by the delayed safety net (the client died
+     * before sending the final chunk) — some files may not have finished uploading.
+     * A flag only (§2 — no PII / filenames).
+     */
+    partial?: boolean;
     /** The pg-boss job id, when known (diagnostics only). */
     jobId?: string;
   };
@@ -46,12 +52,17 @@ export function buildNotification<T extends NotificationType>(
   switch (type) {
     case "bulk_import_complete": {
       const p = params as NotificationParams["bulk_import_complete"];
-      // "12 added · 1 duplicate · 0 failed of 13" — ids/counts only (§2).
+      // "12 added · 1 duplicate · 0 failed of 13" — ids/counts only (§2). When the drop
+      // was auto-sealed (partial), warn that some files may not have finished uploading;
+      // the title/body carry only counts + a system flag, never PII / filenames (§2).
       const dup = `${p.duplicates} ${p.duplicates === 1 ? "duplicate" : "duplicates"}`;
+      const summary = `${p.done} added · ${dup} · ${p.failed} failed of ${p.total}`;
       return {
         type,
-        title: "Bulk import complete",
-        body: `${p.done} added · ${dup} · ${p.failed} failed of ${p.total}`,
+        title: p.partial ? "Bulk import finished (partial)" : "Bulk import complete",
+        body: p.partial
+          ? `${summary} — some files may not have finished uploading`
+          : summary,
         data: {
           // Open the candidates pool filtered to this drop.
           link: `/candidates?batch=${encodeURIComponent(p.batchId)}`,
@@ -60,6 +71,7 @@ export function buildNotification<T extends NotificationType>(
           done: p.done,
           duplicates: p.duplicates,
           failed: p.failed,
+          partial: p.partial ?? false,
           ...(p.jobId !== undefined ? { jobId: p.jobId } : {}),
         },
       };

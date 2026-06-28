@@ -3,8 +3,10 @@ import PgBoss from "pg-boss";
 import {
   CV_PARSE_QUEUE,
   CV_PARSE_BATCH_QUEUE,
+  CV_SEAL_QUEUE,
   type ParseJobData,
   type BatchJobData,
+  type SealJobData,
 } from "@hiredesq/shared";
 
 // pg-boss producer for the cv-parse queue (Postgres-backed, no Redis). The worker
@@ -21,6 +23,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     await this.boss.start();
     await this.boss.createQueue(CV_PARSE_QUEUE);
     await this.boss.createQueue(CV_PARSE_BATCH_QUEUE);
+    await this.boss.createQueue(CV_SEAL_QUEUE);
   }
 
   /**
@@ -43,6 +46,31 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
    */
   async enqueueBatch(batchId: string, data: BatchJobData): Promise<void> {
     await this.boss.send(CV_PARSE_BATCH_QUEUE, data, {
+      singletonKey: batchId,
+      retryLimit: 3,
+      retryBackoff: true,
+    });
+  }
+
+  /**
+   * Schedule the delayed auto-seal safety net for a chunked folder drop. `startAfter`
+   * (seconds) delays the fire; singletonKey = batchId dedups a re-sent first chunk while
+   * the timer is still pending (pg-boss only dedups not-yet-completed jobs, so this is a
+   * best-effort guard, not a hard one). Correctness does NOT rely on it: the worker reads
+   * `sealed` and no-ops when the explicit seal already enqueued the work. The read-gate
+   * isn't atomic, so an explicit+auto race can both enqueue — but that collapses to one
+   * submit downstream: live parses dedup on contentHash (the worker's markParseDone
+   * idempotency), and the batch coordinator dedups on `singletonKey=batchId` while active
+   * + reconnects via `ImportBatch.providerBatchId` (job-agnostic) once submitted, so a
+   * second coordinator settles the existing provider batch instead of submitting again.
+   */
+  async enqueueSeal(
+    batchId: string,
+    data: SealJobData,
+    delaySeconds: number,
+  ): Promise<void> {
+    await this.boss.send(CV_SEAL_QUEUE, data, {
+      startAfter: delaySeconds,
       singletonKey: batchId,
       retryLimit: 3,
       retryBackoff: true,

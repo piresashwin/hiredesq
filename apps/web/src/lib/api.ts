@@ -283,6 +283,14 @@ async function upload<T>(path: string, form: FormData): Promise<T> {
   return (await res.json()) as T;
 }
 
+// A reasonable ceiling per drop — keeps an upload to something that finishes in one
+// sitting, so a flaky mid-upload abandonment (which would leave a partial batch) is
+// the rare exception, not a 2,000-file overnight dump. Over this, we ask the user to
+// split the folder rather than start a multi-minute upload likely to drop. Tune as
+// real usage data comes in.
+const UPLOAD_MAX_FILES = 500;
+const UPLOAD_MAX_BYTES = 500 * 1024 * 1024; // 500 MB total per drop
+
 // Pack a folder drop into byte-bounded chunks for upload(). The budget sits under
 // nginx's request cap with headroom for multipart overhead; MAX_FILES stays under
 // fastify's per-request `files` limit. A file larger than the budget rides alone
@@ -431,10 +439,27 @@ export const api = {
   uploadFiles: async (files: File[], jobId?: string | null): Promise<BulkIngestResponse> => {
     // The whole folder can far exceed any single-request limit (nginx caps the
     // request *total*, fastify caps per-file). Send it as byte-bounded chunks so
-    // no one request is huge and the api never buffers the whole folder at once.
-    // The first chunk creates a server-side ImportBatch; later chunks ride its
-    // batchId so the progress view stays one batch (a single file is never split).
+    // no one request is huge and the api never buffers the whole folder at once
+    // (a single file is never split). Multi-chunk drops are STORE-then-SEAL: the
+    // first request opens a batch (?grouped=1) and carries the full folder count
+    // (?expectedTotal) so the server sets a correct, fixed total; the rest append
+    // by ?batchId; only the final request (?sealed=1) enqueues the parse work for
+    // the whole batch at once — so nothing parses (and the batch can't complete)
+    // until every chunk has landed. Single-chunk drops take the plain path.
+    // Cap the drop up front (it's on the user to split a huge folder). A bounded
+    // upload finishes in one sitting, so an abandoned mid-upload — which would strand
+    // a partial batch server-side — stays rare. Friendly, actionable error.
+    const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+    if (files.length > UPLOAD_MAX_FILES || totalBytes > UPLOAD_MAX_BYTES) {
+      throw new ApiError(
+        413,
+        `That's a large drop (${files.length} files, ${Math.round(totalBytes / 1024 / 1024)} MB). ` +
+          `Please upload up to ${UPLOAD_MAX_FILES} files / ${UPLOAD_MAX_BYTES / 1024 / 1024} MB at a time.`,
+      );
+    }
+
     const chunks = chunkFiles(files);
+    const multi = chunks.length > 1;
     const items: BulkIngestResponse["items"] = [];
     let batchId: string | undefined;
 
@@ -442,9 +467,12 @@ export const api = {
       const params = new URLSearchParams();
       if (jobId) params.set("jobId", jobId);
       if (batchId) params.set("batchId", batchId);
-      // Force a batch on the first request when more chunks follow, so a lone
-      // (oversized) first file still yields a batchId for the rest to join.
-      else if (chunks.length > 1) params.set("grouped", "1");
+      else if (multi) {
+        // First request of a multi-chunk drop: open the batch with the true total.
+        params.set("grouped", "1");
+        params.set("expectedTotal", String(files.length));
+      }
+      if (multi && i === chunks.length - 1) params.set("sealed", "1"); // last chunk
       const qs = params.toString();
       const form = new FormData();
       for (const file of chunks[i]!) form.append("files", file);

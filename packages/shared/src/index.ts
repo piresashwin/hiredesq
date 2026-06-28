@@ -72,11 +72,39 @@ export const STAGE_PROBABILITY: Record<PipelineStage, number> = {
 /** Supported upload kinds the parse pipeline routes on. */
 export type UploadKind = "pdf" | "docx" | "image" | "text" | "csv" | "xlsx";
 
+/** The image media type a parse job hints to the worker (Haiku vision block). */
+export type ImageMediaType = "image/jpeg" | "image/png" | "image/webp";
+
+/**
+ * Canonical extension → image media-type map. The ONE source of truth shared by the
+ * API's upload-kind detection and the worker's seal-time reconstruction — a second copy
+ * would silently rot when a new image type is added on only one side (one-contract rule).
+ */
+export const IMAGE_MEDIA: Record<string, ImageMediaType> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+};
+
+/** Media type for an image extension, or undefined for non-image kinds. */
+export function imageMediaType(ext: string): ImageMediaType | undefined {
+  return IMAGE_MEDIA[ext.toLowerCase()];
+}
+
 /** pg-boss queue name for the CV-parse pipeline (per-item, live). */
 export const CV_PARSE_QUEUE = "cv-parse";
 
 /** pg-boss queue for large bulk drops handled via the Batch API (coordinator). */
 export const CV_PARSE_BATCH_QUEUE = "cv-parse-batch";
+
+/**
+ * pg-boss queue for the delayed auto-seal safety net of a client-chunked folder drop.
+ * The first chunk schedules one delayed job (singletonKey = batchId); if the explicit
+ * `?sealed=1` final chunk never arrives (the client died), this fires and seals the
+ * batch as `partial`, enqueuing the parse work for whatever bytes did land.
+ */
+export const CV_SEAL_QUEUE = "cv-seal";
 
 /**
  * Bulk routing threshold (CLAUDE.md §5): drops with more than this many
@@ -106,6 +134,18 @@ export interface BatchJobData {
   /** Job-centric inbound (§2A, F7): attach every candidate in this drop to the job. */
   jobId?: string;
   items: BatchParseItem[];
+}
+
+/**
+ * Payload for the delayed auto-seal safety net (CV_SEAL_QUEUE). Scheduled by the
+ * first chunk of a client-chunked folder drop; the worker claims the seal idempotently
+ * and enqueues the batch's parse work if the explicit seal never arrived.
+ */
+export interface SealJobData {
+  workspaceId: string;
+  batchId: string;
+  /** Job-centric inbound (§2A, F7): attach the drop's candidates to this job. */
+  jobId?: string;
 }
 
 /** Payload the API enqueues and the worker consumes for one parse. */

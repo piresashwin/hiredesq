@@ -551,6 +551,13 @@ model ImportBatch {
   // RECONNECT to the live provider batch and settle it, instead of submitting a
   // second batch for the same resumes (which strands the first + re-pays, §5).
   providerBatchId String?        @map("provider_batch_id")
+  // Idempotent seal claim: flipped true exactly once by whichever path enqueues the
+  // batch's parse work — the explicit final `?sealed=1` chunk OR the delayed worker
+  // safety net (whichever wins the `sealed: false` UPDATE). `partial` is set only when
+  // the safety net wins (the client died before sending the seal), so the completion
+  // notification can warn that some files may not have finished uploading (§2 flag, no PII).
+  sealed      Boolean           @default(false) @map("sealed")
+  partial     Boolean           @default(false) @map("partial")
   createdAt   DateTime          @default(now()) @map("created_at")
   updatedAt   DateTime          @updatedAt @map("updated_at")
 

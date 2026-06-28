@@ -2,11 +2,14 @@ import PgBoss from "pg-boss";
 import {
   CV_PARSE_QUEUE,
   CV_PARSE_BATCH_QUEUE,
+  CV_SEAL_QUEUE,
   type ParseJobData,
   type BatchJobData,
+  type SealJobData,
 } from "@hiredesq/shared";
 import { processParseJob } from "./parse.processor.js";
 import { processBatchJob } from "./batch.processor.js";
+import { processSealJob } from "./seal.processor.js";
 
 // pg-boss runs the CV-parse queues on Postgres (no Redis). Use the DIRECT (non-
 // pooled) connection — pg-boss relies on LISTEN/NOTIFY and advisory locks, which
@@ -21,6 +24,7 @@ async function main() {
   await boss.start();
   await boss.createQueue(CV_PARSE_QUEUE);
   await boss.createQueue(CV_PARSE_BATCH_QUEUE);
+  await boss.createQueue(CV_SEAL_QUEUE);
 
   // Per-item live parses (the interactive reveal). Several run in parallel; the
   // credit gate reserves atomically so they can't oversell (CLAUDE.md §4).
@@ -38,6 +42,17 @@ async function main() {
     for (const job of jobs) {
       await processBatchJob(job.data);
       console.warn(`[cv-parse-batch] completed job=${job.id}`);
+    }
+  });
+
+  // Delayed auto-seal safety net (CV_SEAL_QUEUE): seals an abandoned chunked drop as
+  // `partial` and enqueues its parse work, so a client that died before sending the
+  // final `?sealed=1` chunk never strands the batch + its stored bytes. Idempotent via
+  // the sealed-claim + the parse/batch singletonKeys (CLAUDE.md §1/§5).
+  await boss.work<SealJobData>(CV_SEAL_QUEUE, { batchSize: 1 }, async (jobs) => {
+    for (const job of jobs) {
+      await processSealJob(boss, job.data);
+      console.warn(`[cv-seal] completed job=${job.id}`);
     }
   });
 
