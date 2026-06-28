@@ -75,6 +75,7 @@ Keys in `deploy/.env.deploy` (sourced by `build.sh`/`deploy.sh`/`bootstrap.sh`/`
 
 | Script | When | What it does |
 |---|---|---|
+| `deploy/deploy-all.sh` | every deploy (one command) | Orchestrator: runs `build.sh` → `deploy.sh` → `migrate.sh` (on the droplet) → restarts `hiredesq-worker` against the new schema. Thin wrapper — every guard in the scripts below still fires. `--no-migrate` / `--skip-build` to trim steps. |
 | `deploy/build.sh` | every deploy | Assembles `release/{api,worker,web}`. Bakes `NEXT_PUBLIC_*` into the web bundle; repairs the prisma-generate symlink/engine damage (see gotchas). |
 | `deploy/deploy.sh` | every deploy | Preflight guards → rsync → vhost reload → `compose up --remove-orphans` → `verify.sh`. Idempotent. |
 | `deploy/verify.sh` | after every deploy (auto + standalone) | Container health, **alias-collision guard**, per-domain app correctness, **cross-domain bleed guard**, cert check. Exits non-zero on failure. |
@@ -108,6 +109,23 @@ re-deploys so the full TLS vhost loads. Renewal is automatic (the shared certbot
 renews every 12h).
 
 ## Subsequent deploys
+
+**One command — build + deploy + migrate + worker restart:**
+
+```bash
+./deploy/deploy-all.sh                 # full release (build → deploy → migrate → restart worker)
+./deploy/deploy-all.sh --no-migrate    # schema unchanged — skip migrate + worker restart
+./deploy/deploy-all.sh --skip-build    # reuse the existing release/ (deploy + migrate only)
+./deploy/deploy-all.sh --help
+```
+
+`deploy-all.sh` just chains the reviewed scripts in order, so every guard below still
+applies. Migrate runs by default because `prisma migrate deploy` is idempotent (a no-op
+when nothing's pending). **First-ever deploy to a fresh host: use `bootstrap.sh`, not this**
+(see "First deploy"). The `compose up --build` step can take **> 2 min** — run it in a
+normal foreground terminal so you see live output (see "Running the build" for agents/CI).
+
+Or run the steps by hand:
 
 ```bash
 ./deploy/build.sh && ./deploy/deploy.sh
