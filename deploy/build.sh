@@ -212,6 +212,19 @@ else
   echo "  (could not locate @prisma/client pnpm dirs — skipping copy)"
 fi
 
+# Sanity-check sharp's linux-musl-x64 native binary shipped. The worker container is
+# alpine (linux/musl/x64) and require('sharp') loads this .node at startup for the CV
+# photo path — a missing binary would crash-loop the worker. `pnpm deploy` only
+# materializes the BUILD HOST's binary by default; pnpm.supportedArchitectures in the
+# root package.json is what also pulls the linux-musl-x64 one into the deploy tree
+# (under .pnpm, symlinked from sharp's own node_modules). Fail loudly if it's absent.
+if ! find "$RELEASE_DIR/worker/node_modules/.pnpm" \
+     -path '*@img+sharp-linuxmusl-x64*/sharp-linuxmusl-x64.node' 2>/dev/null | grep -q .; then
+  echo "ERROR: linux-musl-x64 sharp native binary missing from release/worker" >&2
+  echo "       (check pnpm.supportedArchitectures in the root package.json)" >&2
+  exit 1
+fi
+
 # ---- web ----
 echo "==> pnpm deploy web → release/web"
 # Standalone output is broken with pnpm monorepos. Use pnpm deploy (working prod

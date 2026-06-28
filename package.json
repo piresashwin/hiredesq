@@ -24,5 +24,13 @@
     "turbo": "^2.1.0",
     "typescript": "^5.6.0",
     "typescript-eslint": "^8.10.0"
+  },
+  "pnpm": {
+    "comment": "Fetch optional native binaries (e.g. sharp's @img/*) for the deploy target as well as the host. The worker container is linux-musl-x64 (node:20-alpine); the build host is whatever a dev runs. `current` keeps local dev working, `linux`+`x64`+`musl` makes `pnpm deploy --prod` ship the worker's linux sharp binary so `require('sharp')` doesn't crash in prod (deploy/build.sh asserts it landed).",
+    "supportedArchitectures": {
+      "os": ["current", "linux"],
+      "cpu": ["current", "x64"],
+      "libc": ["current", "musl"]
+    }
   }
 }
