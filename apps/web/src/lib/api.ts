@@ -488,6 +488,8 @@ export const api = {
   },
   getImportBatch: (id: string) =>
     request<ImportBatchDto>(workspacePath(`/import-batches/${id}`)),
+  getActiveBatches: () =>
+    request<ImportBatchDto[]>(workspacePath("/import-batches/active")),
 
   // Dedup review (design-system Principle 6) — name-only matches awaiting a
   // confirm (merge) / dismiss (keep both) decision.

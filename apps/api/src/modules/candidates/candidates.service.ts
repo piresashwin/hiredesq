@@ -113,6 +113,20 @@ export class CandidatesService {
       ORDER BY "embedding" <=> ${literal}::vector
       LIMIT ${take}
     `;
+
+    // If no candidates have embeddings at all (imported before embedding was wired up,
+    // or ingest failed silently), fall back to keyword rather than returning nothing.
+    if (ranked.length === 0) {
+      const [{ count }] = await this.prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(*) AS count FROM "candidate"
+        WHERE "workspace_id" = ${workspaceId} AND "embedding" IS NOT NULL
+      `;
+      if (count === 0n) {
+        this.logger.warn(`semantic search: no embeddings for ws=${workspaceId} — keyword fallback`);
+        return this.search(workspaceId, term, take);
+      }
+    }
+
     return this.hydrateRanked(workspaceId, ranked);
   }
 
@@ -145,7 +159,7 @@ export class CandidatesService {
           OR "full_name" ILIKE ${like}
           OR "current_title" ILIKE ${like}
           OR "current_company" ILIKE ${like}
-          OR EXISTS (SELECT 1 FROM unnest("skills") s WHERE s ILIKE ${like})
+          OR EXISTS (SELECT 1 FROM unnest("skills") s WHERE s ILIKE ${like} OR s % ${term})
           -- Also match PAST roles: a candidate's relevant title (e.g. "Case Officer")
           -- often lives in their experience history, not their current title. Without
           -- this, keyword search can never find them by what they used to do.

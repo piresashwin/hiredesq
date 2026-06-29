@@ -14,6 +14,14 @@ import { ImportBatchesService } from "./import-batches.service.js";
 export class ImportBatchesController {
   constructor(private readonly batches: ImportBatchesService) {}
 
+  @Get("active")
+  @RequirePermission("read", "candidate")
+  getActive(
+    @Param("workspaceId") workspaceId: string,
+  ): Promise<ImportBatchDto[]> {
+    return this.batches.getActive(workspaceId);
+  }
+
   @Get(":id")
   @RequirePermission("read", "candidate")
   get(

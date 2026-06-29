@@ -8,6 +8,28 @@ export class ImportBatchesService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  async getActive(workspaceId: string): Promise<ImportBatchDto[]> {
+    const batches = await this.prisma.importBatch.findMany({
+      where: { workspaceId, status: "processing" },
+      include: { job: { select: { title: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+    return batches.map((b) => ({
+      id: b.id,
+      source: b.source,
+      status: b.status,
+      total: b.total,
+      done: b.done,
+      failed: b.failed,
+      duplicates: b.duplicates,
+      createdAt: b.createdAt.toISOString(),
+      updatedAt: b.updatedAt.toISOString(),
+      jobId: b.jobId,
+      jobTitle: b.job?.title ?? null,
+    }));
+  }
+
   async getById(workspaceId: string, id: string): Promise<ImportBatchDto> {
     // Tenant-scoped lookup — never `where: { id }` alone (§1). Join the target job
     // (F7) for the progress label ("12 CVs for Senior Nurse — Kuwait").

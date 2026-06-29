@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/marketing/Logo";
 import { CreditMeter } from "@/components/shell/CreditMeter";
+import { JobProgressIndicator } from "@/components/shell/JobProgressIndicator";
 import { NotificationBell } from "@/components/shell/NotificationBell";
 import { ProfileMenu } from "@/components/shell/ProfileMenu";
 import { TourButton } from "@/components/shell/TourButton";
@@ -20,6 +21,7 @@ export function TopBar() {
 
       <div className="ml-auto flex items-center gap-2 sm:gap-3">
         <TourButton />
+        <JobProgressIndicator />
         <NotificationBell />
         <CreditMeter />
         <div className="lg:hidden">

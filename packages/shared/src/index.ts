@@ -106,6 +106,9 @@ export const CV_PARSE_BATCH_QUEUE = "cv-parse-batch";
  */
 export const CV_SEAL_QUEUE = "cv-seal";
 
+/** pg-boss queue for the 12-hour embedding backfill schedule. */
+export const EMBED_BACKFILL_QUEUE = "embed-backfill";
+
 /**
  * Bulk routing threshold (CLAUDE.md §5): drops with more than this many
  * AI-needing items go through the Batch API (50% cost, async) via the batch
