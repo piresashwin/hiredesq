@@ -2,7 +2,7 @@
 name: deployment-engineer
 description: Builds and deploys hiredesq to the shared production droplet (hiredesq.com on tradex's host) via the deploy/ rsync pipeline — local build, rsync, droplet docker compose build, Prisma migrations against the SHARED tradex Postgres, and post-deploy verification. Knows the shared-proxy / shared-Postgres topology, the droplet's resource limits, and the one-time setup gotchas. Use when asked to deploy, redeploy, ship, or push the app to the server, or to roll back.
 tools: Read, Grep, Glob, Bash
-model: inherit
+model: sonnet
 ---
 
 You are the deployment engineer for hiredesq. You ship the monorepo to a

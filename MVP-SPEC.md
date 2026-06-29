@@ -106,12 +106,19 @@ ToS/scraper liability. We win on the return path; commodity outbound stays out.
 
 **Principle:** the *clean pool, search, jobs, trail, and revenue view are free forever*; **AI generation volume** and **team** are what you charge for.
 
-- **Free (individual):** full pool, **semantic search**, manual entry, jobs + trail + constraint filter, revenue view — all free. **AI generation** actions (resume parse **and** submission generation) gated by **monthly credits** (e.g. ~50–100 generations/mo). Hitting the cap is the upgrade prompt — never a paywall on day 1.
-- **Paid (team, 5–10):** high/unlimited AI credits, multi-seat, shared pipelines, role permissions.
+AI generation runs on **two meters**, and both limits are **DB-driven** — they live as rows in a `Plan` table the credit gate reads at runtime (changing a price or limit is a data edit, not a deploy):
+- **Submission generation** — a **daily allotment** (reserve→commit/refund, §4).
+- **Resume parsing (ingest)** — a **lifetime onboarding quota** on free, so the §2A backlog-dump never paywalls on day 1; unmetered on paid.
+
+- **Free (Solo) — $0:** full pool, **semantic search**, manual entry, jobs + trail + constraint filter, revenue view — all free forever. **~5 submissions/day** + a generous **~1,000-parse lifetime ingest quota**. Hitting a meter is the upgrade prompt — never a day-1 paywall.
+- **Solo Pro — ~$29/mo:** single seat, **~50 submissions/day** (effectively unlimited for a solo), **unmetered parsing**, forwarding inbox. Captures the full-time solo biller the incumbents (~$99–169/seat) price out — monetization without a blocker.
+- **Team — ~$39/seat/mo (2–10 seats):** **unmetered AI generation**, multi-seat, shared pipelines, role permissions.
+
+Paid tiers include a monthly **AI Mode** allowance; usage beyond it meters per the §4 scope below (Haiku tokens + margin). Pricing scales with the recruiter's *success*, not their trial.
 
 **What costs a credit:** generative AI calls only — a resume parse, a submission generation. **Search and the constraint filter are free** (semantic search is cheap embeddings; the constraint filter is pure deterministic data — no AI call at all; gating recall/qualification would defeat the point of the pool).
 
-**Credit math is safe** — a resume parse on Haiku 4.5 (~2,200 in / ~500 out) costs a fraction of a cent; a submission generation is similar. 100 free generations/mo ≈ pennies of COGS. Credits exist to drive upgrade intent and cap abuse, **not** to cover cost.
+**Credit math is safe** — a resume parse on Haiku 4.5 (~2,200 in / ~500 out) costs a fraction of a cent; a submission generation is similar. The free daily submissions + the lifetime ingest quota ≈ pennies of COGS (a 500-CV backlog dump is ~$1–2 of Haiku). Credits exist to drive upgrade intent and cap abuse, **not** to cover cost.
 
 > **Scope (ratified — see FEATURE-SET Decision 4):** the "not to cover cost" rule holds for **fixed-cost** actions (parse, submission). The **post-v1 AI Mode agent** (FEATURE-SET F10) is **open-ended**, so it is the one **usage-metered** surface — billed at Haiku token cost + margin, through the same reserve→settle gate. Free-forever surfaces (pool, search, jobs, trail, revenue) stay free; the meter applies only to the agent's own AI turns.
 

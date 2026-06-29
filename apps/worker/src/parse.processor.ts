@@ -11,7 +11,6 @@ import {
   type ParseSource,
 } from "@hiredesq/ai";
 import {
-  INGEST_FREE_LIMIT,
   encryptField,
   findDuplicate,
   normalizeEmail,
@@ -606,12 +605,23 @@ export async function reserveIngestSlot(workspaceId: string, contentHash: string
       data: { status: "processing" },
     });
 
-    if (account.workspace.plan !== "free") return false; // paid: unmetered
+    // Read the ingest ceiling from the Plan reference table — inside the same
+    // transaction so the ceiling is consistent with the increment that follows.
+    // null = unmetered (paid plans). CRITICAL: the ceiling is passed directly into
+    // the conditional UPDATE below, so enforcement stays atomic — no read-then-write.
+    const planRow = await tx.plan.findUnique({
+      where: { tier: account.workspace.plan },
+      select: { ingestFreeLimit: true },
+    });
+    const ingestFreeLimit = planRow?.ingestFreeLimit ?? null;
+
+    if (ingestFreeLimit === null) return false; // unmetered tier — no metering needed
     if (claimed.count === 0) return false; // already reserved on a prior attempt
 
     // Enforce the ceiling IN the increment: zero rows updated ⇒ at/over the cap.
+    // RACE-SAFE: the ceiling check and increment happen in the same conditional UPDATE.
     const metered = await tx.creditAccount.updateMany({
-      where: { workspaceId, ingestUsedLifetime: { lt: INGEST_FREE_LIMIT } },
+      where: { workspaceId, ingestUsedLifetime: { lt: ingestFreeLimit } },
       data: { ingestUsedLifetime: { increment: 1 } },
     });
     if (metered.count === 0) throw new IngestQuotaError();
@@ -667,15 +677,27 @@ export async function failParseAndReleaseSlot(
       });
       return;
     }
+    // Decide whether to release by reading Plan.ingestFreeLimit — same rule as
+    // reserveIngestSlot. null = unmetered (paid tiers): never touch the counter.
+    // This keeps failParseAndReleaseSlot consistent with the reserve logic regardless
+    // of which tiers are metered in the future.
     const account = await tx.creditAccount.findUnique({
       where: { workspaceId },
       select: { workspace: { select: { plan: true } } },
     });
-    if (account?.workspace.plan === "free") {
-      await tx.creditAccount.updateMany({
-        where: { workspaceId, ingestUsedLifetime: { gt: 0 } },
-        data: { ingestUsedLifetime: { decrement: 1 } },
+    if (account) {
+      const planRow = await tx.plan.findUnique({
+        where: { tier: account.workspace.plan },
+        select: { ingestFreeLimit: true },
       });
+      // ingestFreeLimit !== null ⇒ this tier is metered → release the held slot.
+      // The gt: 0 floor guard prevents the counter from going negative.
+      if (planRow?.ingestFreeLimit !== null && planRow?.ingestFreeLimit !== undefined) {
+        await tx.creditAccount.updateMany({
+          where: { workspaceId, ingestUsedLifetime: { gt: 0 } },
+          data: { ingestUsedLifetime: { decrement: 1 } },
+        });
+      }
     }
   });
 }

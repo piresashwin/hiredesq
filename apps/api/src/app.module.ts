@@ -20,6 +20,7 @@ import { UpgradeInterestModule } from "./modules/upgrade-interest/upgrade-intere
 import { StatsModule } from "./modules/stats/stats.module.js";
 import { CustomFieldsModule } from "./modules/custom-fields/custom-fields.module.js";
 import { NotificationsModule } from "./modules/notifications/notifications.module.js";
+import { PlansModule } from "./modules/plans/plans.module.js";
 
 // CommonModule is @Global() — provides PrismaService + the guard stack to every
 // feature module. Each workspace-scoped module follows the /nestjs-module skill.
@@ -46,6 +47,7 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
     StatsModule,
     CustomFieldsModule,
     NotificationsModule,
+    PlansModule,
   ],
 })
 export class AppModule {}

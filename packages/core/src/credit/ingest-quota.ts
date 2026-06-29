@@ -5,24 +5,35 @@
  * the activation moment ("I dumped my 200-resume backlog") never paywalls on day 1,
  * while a scripted-abuse dump still hits a ceiling.
  *
- * The quota is a single lifetime counter: a free workspace may parse up to
- * INGEST_FREE_LIMIT before ingest nudges an upgrade. This generously covers any
- * real solo backlog (a 500-CV dump costs ~$1–2 of Haiku COGS) while bounding abuse.
- * Paid (team) plans are unmetered — the gate only applies on the free plan.
+ * The live ceiling is read from the Plan reference table (Plan.ingestFreeLimit) at
+ * runtime by the credits service and the worker's reserveIngestSlot. null in the DB
+ * means unmetered (paid tiers). The functions below are pure helpers that accept a
+ * `limit` argument; callers pass the DB-sourced value.
+ *
+ * INGEST_FREE_LIMIT is the SEED DEFAULT for the free tier — the value placed in
+ * the Plan table row for `free` by the seed script. It is NOT used as the live
+ * ceiling by any service or worker path; changing a price/limit is a data edit, not
+ * a deploy. This constant exists only so the seed is self-documenting.
  *
  * Pure domain logic — the persistence/lock lives in the worker + credits service.
  */
-export const INGEST_FREE_LIMIT = 1000;
+export const INGEST_FREE_LIMIT = 1000; // seed default for the free tier; live ceiling in Plan table
 
-/** Free-tier ingest is allowed while lifetime usage is under the limit. */
-export function canParseFree(usedLifetime: number, limit: number = INGEST_FREE_LIMIT): boolean {
+/**
+ * Free-tier ingest is allowed while lifetime usage is under the limit. `limit`
+ * is REQUIRED — callers must null-check Plan.ingestFreeLimit first (null = unmetered,
+ * so this function is never called for unmetered tiers). The default has been removed
+ * deliberately so passing the raw nullable DB value is a compile error, not a silent
+ * substitution of the seed default.
+ */
+export function canParseFree(usedLifetime: number, limit: number): boolean {
   return usedLifetime < limit;
 }
 
-/** How many free parses remain (never negative) — for the UI meter / 402 copy. */
-export function ingestQuotaRemaining(
-  usedLifetime: number,
-  limit: number = INGEST_FREE_LIMIT,
-): number {
+/**
+ * How many free parses remain (never negative) — for the UI meter / 402 copy.
+ * `limit` is REQUIRED — same null-check requirement as canParseFree above.
+ */
+export function ingestQuotaRemaining(usedLifetime: number, limit: number): number {
   return Math.max(0, limit - usedLifetime);
 }

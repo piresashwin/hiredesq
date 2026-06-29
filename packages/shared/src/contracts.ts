@@ -775,7 +775,7 @@ export interface SharedSubmissionDto {
 
 // ─────────────────────────── Credits (§4) ───────────────────────────
 
-export type PlanTier = "free" | "team";
+export type PlanTier = "free" | "solo_pro" | "team";
 
 export interface CreditBalanceDto {
   balance: number;
@@ -788,9 +788,32 @@ export interface CreditBalanceDto {
   resetsAt: string;
   plan: PlanTier;
   /** Model B ingest meter (§F3): resume parsing is free up to `ingestFreeLimit`
-   * lifetime parses (the onboarding/abuse ceiling), then nudges an upgrade. */
+   * lifetime parses (the onboarding/abuse ceiling), then nudges an upgrade.
+   * null = unmetered (paid tiers with no ingest ceiling). */
   ingestUsedLifetime: number;
-  ingestFreeLimit: number;
+  ingestFreeLimit: number | null;
+}
+
+/**
+ * One pricing tier as returned by GET /plans (for the pricing/upgrade UI).
+ * priceMonthly is a string — Decimal serialized losslessly, never a JS number (§3).
+ * ingestFreeLimit null = unmetered ingest (paid tiers).
+ * seatLimit null = unlimited seats.
+ */
+export interface PlanDto {
+  tier: PlanTier;
+  name: string;
+  /** Monthly price, Decimal serialized as a string (CLAUDE.md §3). */
+  priceMonthly: string;
+  currency: string;
+  /** true for Team (billed per seat); false for Free / Solo Pro (flat rate). */
+  perSeat: boolean;
+  /** Daily submission-generation credit allotment for this tier. */
+  dailySubmissionAllotment: number;
+  /** Lifetime free parses; null = unmetered ingest. */
+  ingestFreeLimit: number | null;
+  /** Max workspace members; null = unlimited. */
+  seatLimit: number | null;
 }
 
 /** A Stripe-hosted URL to redirect the recruiter to (checkout or billing portal, F8). */

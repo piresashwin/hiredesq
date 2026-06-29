@@ -1,17 +1,13 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import type { CreditBalanceDto, PlanTier } from "@hiredesq/shared";
-import { CreditAccount, canParseFree, INGEST_FREE_LIMIT } from "@hiredesq/core";
+import { CreditAccount, canParseFree } from "@hiredesq/core";
 import { PrismaService } from "../../common/prisma.service.js";
 import { isNewDay, startOfNextDay } from "./day-period.js";
 
-// Free tier: 5 submission generations/day (Model B, §F3). Team: effectively
-// unlimited for a small team — the meter stays honest (still reserve→commit) but
-// never caps real use. Ingest is already unmetered for non-free (hasIngestQuota).
-const FREE_DAILY_ALLOTMENT = 5;
-const TEAM_DAILY_ALLOTMENT = 10_000;
-
 @Injectable()
 export class CreditsService {
+  private readonly logger = new Logger(CreditsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   /**
@@ -74,6 +70,17 @@ export class CreditsService {
     });
     if (!workspace) throw new NotFoundException("workspace not found");
 
+    // Read the ingest ceiling from the Plan reference table, not a hardcoded constant.
+    const planRow = await this.prisma.plan.findUnique({
+      where: { tier: workspace.plan },
+      select: { ingestFreeLimit: true },
+    });
+    if (!planRow) {
+      this.logger.warn(`plan row missing for tier=${workspace.plan}; defaulting ingestFreeLimit to null`);
+    }
+    // null = unmetered ingest for this tier (paid plans).
+    const ingestFreeLimit = planRow?.ingestFreeLimit ?? null;
+
     const balance = workspace.creditAccount?.balance ?? 0;
     const dailyAllotment = workspace.creditAccount?.dailyAllotment ?? 0;
     return {
@@ -82,9 +89,10 @@ export class CreditsService {
       used: Math.max(0, dailyAllotment - balance),
       resetsAt: startOfNextDay(new Date()).toISOString(),
       plan: workspace.plan,
-      // Model B ingest meter (§F3): resume parsing is free up to this lifetime cap.
+      // Model B ingest meter (§F3): resume parsing is free up to ingestFreeLimit.
+      // null = unmetered (paid tiers).
       ingestUsedLifetime: workspace.creditAccount?.ingestUsedLifetime ?? 0,
-      ingestFreeLimit: INGEST_FREE_LIMIT,
+      ingestFreeLimit,
     };
   }
 
@@ -105,10 +113,10 @@ export class CreditsService {
 
   /**
    * Advisory pre-check for the INGEST (parse) paths (Model B, §F3). Parsing is free,
-   * but the free tier is capped by a lifetime onboarding/abuse quota — so a backlog
-   * dump never paywalls on day 1, while abuse hits a ceiling. Paid plans are
-   * unmetered. The worker's `reserveIngestSlot` is the true gate; this enables a
-   * graceful 402 with the right copy.
+   * but metered tiers are capped by a lifetime onboarding/abuse quota — so a backlog
+   * dump never paywalls on day 1, while abuse hits a ceiling. Paid plans (ingestFreeLimit
+   * = null) are unmetered. The worker's `reserveIngestSlot` is the true gate; this
+   * enables a graceful 402 with the right copy.
    */
   async hasIngestQuota(workspaceId: string): Promise<boolean> {
     const account = await this.prisma.creditAccount.findUnique({
@@ -116,8 +124,15 @@ export class CreditsService {
       select: { ingestUsedLifetime: true, workspace: { select: { plan: true } } },
     });
     if (!account) return false;
-    if (account.workspace.plan !== "free") return true; // paid: unmetered
-    return canParseFree(account.ingestUsedLifetime);
+
+    // Read the ceiling from the Plan table; null = unmetered.
+    const planRow = await this.prisma.plan.findUnique({
+      where: { tier: account.workspace.plan },
+      select: { ingestFreeLimit: true },
+    });
+    const limit = planRow?.ingestFreeLimit ?? null;
+    if (limit === null) return true; // unmetered tier (paid)
+    return canParseFree(account.ingestUsedLifetime, limit);
   }
 
   /**
@@ -195,13 +210,29 @@ export class CreditsService {
 
   /**
    * Set the daily submission allotment to match a plan (F8). Called by the billing
-   * webhook when a workspace flips free↔team so the paid tier actually delivers
-   * (free = 5/day; team ≈ unlimited). Goes through the CreditAccount aggregate's
-   * renew() — never a raw balance write (§4) — so an in-flight reservation survives
-   * the change, and applies the new balance immediately (the upgrade is instant).
+   * webhook when a workspace changes plan so the new tier's limits take effect
+   * immediately. Reads the allotment from the Plan reference table — no hardcoded
+   * constants. Goes through the CreditAccount aggregate's renew() — never a raw
+   * balance write (§4) — so an in-flight reservation survives the change.
+   *
+   * Supports all PlanTier values including solo_pro. When a STRIPE_SOLO_PRICE_ID →
+   * solo_pro mapping ships, the billing webhook can call this with plan="solo_pro"
+   * and the correct allotment is already in the Plan table.
+   * TODO: add STRIPE_SOLO_PRICE_ID → solo_pro mapping in billing.service.ts when
+   * Solo Pro checkout ships (the createCheckout + setPlanByCustomer paths).
    */
   async applyPlanAllotment(workspaceId: string, plan: PlanTier): Promise<void> {
-    const allotment = plan === "team" ? TEAM_DAILY_ALLOTMENT : FREE_DAILY_ALLOTMENT;
+    // Read the daily allotment from the Plan reference table. Throw clearly if the
+    // plan row is missing (a seed/config error, not a runtime invariant).
+    const planRow = await this.prisma.plan.findUnique({
+      where: { tier: plan },
+      select: { dailySubmissionAllotment: true },
+    });
+    if (!planRow) {
+      throw new NotFoundException(`plan row missing for tier=${plan}; run the seed to populate the plan table`);
+    }
+    const allotment = planRow.dailySubmissionAllotment;
+
     await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM credit_account WHERE workspace_id = ${workspaceId} FOR UPDATE`;
       const account = await tx.creditAccount.findUnique({ where: { workspaceId } });

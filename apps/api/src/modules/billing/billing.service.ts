@@ -36,7 +36,12 @@ export class BillingService {
     return process.env.APP_URL ?? "http://localhost:3000";
   }
 
-  /** Start a Stripe Checkout for the team plan; returns the hosted URL to redirect to. */
+  /**
+   * Start a Stripe Checkout for the team plan; returns the hosted URL to redirect to.
+   * TODO: when Solo Pro checkout ships, add STRIPE_SOLO_PRICE_ID → solo_pro here
+   * (accept a `plan` param and route to the right price id). applyPlanAllotment already
+   * reads the allotment from the Plan table for any PlanTier, so the credit side is ready.
+   */
   async createCheckout(workspaceId: string, userId: string): Promise<BillingRedirectDto> {
     const priceId = process.env.STRIPE_TEAM_PRICE_ID;
     if (!priceId) throw new BadRequestException("billing not configured");
@@ -177,6 +182,9 @@ export class BillingService {
       await this.setPlan(ws.id, "free", { stripeSubscriptionId: null });
       return;
     }
+    // TODO: when Solo Pro checkout ships, map STRIPE_SOLO_PRICE_ID → "solo_pro" here.
+    // Inspect the subscription's price id and pass the correct PlanTier to setPlan.
+    // applyPlanAllotment already handles all PlanTier values via the Plan table.
     await this.setPlan(ws.id, "team", { stripeSubscriptionId: subscriptionId });
   }
 }

@@ -166,8 +166,10 @@ function BillingContent({
   const low = !isTeam && dailyAllotment > 0 && ratio <= LOW_RATIO;
   const usedPct = dailyAllotment > 0 ? Math.min(100, Math.round((used / dailyAllotment) * 100)) : 0;
   const resets = resetLabel(resetsAt);
-  // Model B (§F3): resume parsing is free, metered by a lifetime ingest quota.
-  const parsesLeft = Math.max(0, ingestFreeLimit - ingestUsedLifetime);
+  // Model B (§F3): resume parsing is free; metered only on plans with an ingest
+  // ceiling. null = unmetered (paid tiers — unlimited parses).
+  const ingestMetered = ingestFreeLimit !== null;
+  const parsesLeft = ingestMetered ? Math.max(0, ingestFreeLimit - ingestUsedLifetime) : null;
 
   return (
     <>
@@ -237,13 +239,19 @@ function BillingContent({
           )}
         </p>
 
-        {/* Model B: resume parsing is free, metered by the lifetime ingest quota. */}
+        {/* Model B: resume parsing is free — metered on free tier, unlimited on paid. */}
         <div className="mt-4 border-t border-line pt-3">
           <p className="text-sm text-muted">
             <span className="font-medium text-ink">Resume parsing is free.</span>{" "}
-            <span className="nums tabular-nums">{parsesLeft.toLocaleString()}</span> of{" "}
-            <span className="nums tabular-nums">{ingestFreeLimit.toLocaleString()}</span> free
-            parses remaining — paste or upload as much as you like to build your database.
+            {ingestMetered ? (
+              <>
+                <span className="nums tabular-nums">{parsesLeft!.toLocaleString()}</span> of{" "}
+                <span className="nums tabular-nums">{ingestFreeLimit!.toLocaleString()}</span> free
+                parses remaining — paste or upload as much as you like to build your database.
+              </>
+            ) : (
+              <>Unlimited parses on your plan — paste or upload as much as you like.</>
+            )}
           </p>
         </div>
       </section>

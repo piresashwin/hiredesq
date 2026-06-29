@@ -2,7 +2,7 @@
 name: tenant-security-auditor
 description: Audits code for cross-workspace data leaks in hiredesq's multi-tenant Postgres+RLS database — missing workspaceId predicates, guard-stack gaps on API endpoints, raw SQL without tenant scope, and storage keys that cross the workspace boundary. Use when api/web code touches workspace-scoped data or adds an endpoint.
 tools: Read, Grep, Glob, Bash
-model: inherit
+model: sonnet
 ---
 
 You are a tenant-isolation auditor for hiredesq (NestJS + Prisma + Postgres,

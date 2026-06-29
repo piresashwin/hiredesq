@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import type { BatchParseItem, CandidateProfile } from "@hiredesq/shared";
 import type { BatchParseResult } from "@hiredesq/ai";
 import { INGEST_FREE_LIMIT } from "@hiredesq/core";
+import { Prisma } from "@hiredesq/database";
 // Reuse the processor's OWN PrismaClient so seeds + asserts share its connection/DB.
 import {
   prisma,
@@ -27,7 +28,28 @@ before(async () => {
   } catch {
     dbUp = false;
     console.warn("[race.itest] no Postgres reachable — skipping integration suite");
+    return;
   }
+
+  // Ensure the Plan reference rows exist before any metered test runs.
+  // reserveIngestSlot reads Plan.ingestFreeLimit to decide whether to meter; without
+  // these rows planRow = null → ingestFreeLimit = null → every tier looks unmetered,
+  // so the quota race assertions would pass for the wrong reason. Upsert is idempotent.
+  await prisma.plan.upsert({
+    where: { tier: "free" },
+    update: {},
+    create: { tier: "free", name: "Free", priceMonthly: new Prisma.Decimal("0.00"), currency: "USD", perSeat: false, dailySubmissionAllotment: 5, ingestFreeLimit: INGEST_FREE_LIMIT, seatLimit: 1 },
+  });
+  await prisma.plan.upsert({
+    where: { tier: "solo_pro" },
+    update: {},
+    create: { tier: "solo_pro", name: "Solo Pro", priceMonthly: new Prisma.Decimal("29.00"), currency: "USD", perSeat: false, dailySubmissionAllotment: 50, ingestFreeLimit: null, seatLimit: 1 },
+  });
+  await prisma.plan.upsert({
+    where: { tier: "team" },
+    update: {},
+    create: { tier: "team", name: "Team", priceMonthly: new Prisma.Decimal("39.00"), currency: "USD", perSeat: true, dailySubmissionAllotment: 10000, ingestFreeLimit: null, seatLimit: 10 },
+  });
 });
 after(async () => {
   await prisma.$disconnect();

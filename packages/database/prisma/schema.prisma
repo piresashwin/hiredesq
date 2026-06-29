@@ -21,7 +21,42 @@ datasource db {
 
 enum PlanTier {
   free
+  solo_pro
   team
+}
+
+// ─────────────────────────── Pricing tiers (global config) ───────────────────────────
+
+// Global reference / config data — NOT tenant-scoped. This table holds the
+// canonical pricing & feature limits for each PlanTier. It is deliberately
+// workspace-free: pricing config is public reference data shared across all
+// workspaces. This is an intentional §1 exception — there is no workspaceId
+// because the data is NOT tenant data. Do NOT add a workspaceId here.
+// priceMonthly is Decimal @db.Decimal(14,2) — money, never Float (CLAUDE.md §3).
+model Plan {
+  tier PlanTier @id
+
+  name         String
+  // Decimal, never Float — money is always Decimal (CLAUDE.md §3).
+  priceMonthly Decimal  @map("price_monthly") @db.Decimal(14, 2)
+  currency     String   @default("USD")
+  // true for Team (billed per seat); false for Free / Solo Pro (flat rate).
+  perSeat      Boolean  @default(false) @map("per_seat")
+
+  // Daily submission-generation credit allotment for this tier (Model B, §F3).
+  dailySubmissionAllotment Int @map("daily_submission_allotment")
+  // Lifetime free parses before ingest nudges an upgrade; null = unmetered (paid).
+  ingestFreeLimit          Int? @map("ingest_free_limit")
+  // Max workspace members; null = unlimited.
+  seatLimit                Int? @map("seat_limit")
+  // F10 AI-Mode monthly allowance in integer micro-USD (CLAUDE.md §4: never float).
+  // Reserved for future use; 0 = no AI-Mode allowance.
+  aiModeMonthlyAllowanceMicroUsd BigInt @default(0) @map("ai_mode_monthly_allowance_micro_usd")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("plan")
 }
 
 enum WorkspaceRole {

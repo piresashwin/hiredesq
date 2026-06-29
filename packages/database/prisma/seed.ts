@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 
 // Dev seed — one workspace (free tier) with an owner and a starter credit
 // balance, so `pnpm dev` comes up with something to log into and parse against.
@@ -9,6 +9,52 @@ const DEV_USER_EMAIL = "founder@hiredesq.dev";
 const FREE_TIER_CREDITS = 5; // daily free-tier allotment (MVP-SPEC §4)
 
 async function main() {
+  // ── Plan reference data (global pricing config, not tenant-scoped) ──
+  // Upsert all three tiers idempotently. priceMonthly is Decimal (§3).
+  await prisma.plan.upsert({
+    where: { tier: "free" },
+    update: {},
+    create: {
+      tier: "free",
+      name: "Free",
+      priceMonthly: new Prisma.Decimal("0.00"),
+      currency: "USD",
+      perSeat: false,
+      dailySubmissionAllotment: 5,
+      ingestFreeLimit: 1000,
+      seatLimit: 1,
+    },
+  });
+
+  await prisma.plan.upsert({
+    where: { tier: "solo_pro" },
+    update: {},
+    create: {
+      tier: "solo_pro",
+      name: "Solo Pro",
+      priceMonthly: new Prisma.Decimal("29.00"),
+      currency: "USD",
+      perSeat: false,
+      dailySubmissionAllotment: 50,
+      ingestFreeLimit: null, // null = unmetered ingest
+      seatLimit: 1,
+    },
+  });
+
+  await prisma.plan.upsert({
+    where: { tier: "team" },
+    update: {},
+    create: {
+      tier: "team",
+      name: "Team",
+      priceMonthly: new Prisma.Decimal("39.00"),
+      currency: "USD",
+      perSeat: true,
+      dailySubmissionAllotment: 10000,
+      ingestFreeLimit: null, // null = unmetered ingest
+      seatLimit: 10,
+    },
+  });
   const user = await prisma.user.upsert({
     where: { email: DEV_USER_EMAIL },
     update: {},
