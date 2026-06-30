@@ -141,6 +141,25 @@ export const upgradeInterestStore = {
   },
 };
 
+// Remembers, per workspace + ingest period, which nudge level the recruiter last
+// dismissed — so the "approaching your ingest limit" banner doesn't re-nag on every
+// page load. Keyed by a period token (calendar month for solo_pro, "lifetime" for
+// free) so it re-arms when a monthly meter resets; the banner re-appears anyway when
+// the level ESCALATES (banner → wall) because the stored level no longer matches.
+// Local-only; no PII, just a level string. See ingestNudgeLevel in @hiredesq/shared.
+const INGEST_NUDGE_KEY = "hiredesq.ingestNudge";
+
+export const ingestNudgeStore = {
+  dismissedLevel(workspaceId: string, periodToken: string): string | null {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem(`${INGEST_NUDGE_KEY}.${workspaceId}.${periodToken}`);
+  },
+  dismiss(workspaceId: string, periodToken: string, level: string): void {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(`${INGEST_NUDGE_KEY}.${workspaceId}.${periodToken}`, level);
+  },
+};
+
 // Theme preference is the source-of-truth on the account (synced across devices),
 // but we cache the last-known value locally so the no-flash boot script in the
 // root layout can paint the right palette before React (and the user record) load.

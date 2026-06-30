@@ -9,6 +9,7 @@ import { TopBar } from "@/components/shell/TopBar";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { BottomTabs } from "@/components/shell/BottomTabs";
 import { IngestSlideOver } from "@/components/ingest/IngestSlideOver";
+import { IngestQuotaNudge } from "@/components/ingest/IngestQuotaNudge";
 import { OnboardingCarousel } from "@/components/onboarding/OnboardingCarousel";
 import { SpotlightProvider } from "@/components/search/Spotlight";
 import { SpinnerIcon } from "@/components/ui/Icon";
@@ -45,6 +46,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <SpotlightProvider>
         <div className="flex min-h-screen flex-col">
           <TopBar />
+          {/* Approaching-ingest-limit upgrade nudge (§4/§5) — celebratory, dismissible,
+              app-wide; renders nothing until the workspace nears its parse ceiling. */}
+          <IngestQuotaNudge />
           <div className="flex flex-1">
             <Sidebar />
             {/* pb-16 leaves room for the mobile bottom tab bar. */}

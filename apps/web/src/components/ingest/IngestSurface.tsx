@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import type { BulkIngestResponse, CreditBalanceDto, ImportBatchDto } from "@hiredesq/shared";
+import {
+  ingestNudgeLevel,
+  type BulkIngestResponse,
+  type CreditBalanceDto,
+  type ImportBatchDto,
+} from "@hiredesq/shared";
 import { api, ApiError } from "@/lib/api";
 import { useIngest } from "@/lib/ingest-context";
 import { useToast } from "@/components/ui/Toast";
@@ -118,22 +123,35 @@ export function IngestSurface({
 
   // The free AI allotment is exhausted. We only treat a *known* zero balance as
   // exhausted; an unknown balance never gates the surface.
-  const outOfCredits = credits !== null && credits.dailyAllotment > 0 && credits.balance <= 0;
+  const outOfCredits = credits !== null && credits.monthlyAllotment > 0 && credits.balance <= 0;
   const resets = credits ? resetLabel(credits.resetsAt) : "";
   // Quiet "N left" hint near the submit when low-but-not-zero (don't nag).
   const lowRemaining =
     credits !== null &&
-    credits.dailyAllotment > 0 &&
+    credits.monthlyAllotment > 0 &&
     credits.balance > 0 &&
-    credits.balance / credits.dailyAllotment <= 0.15
+    credits.balance / credits.monthlyAllotment <= 0.15
       ? credits.balance
       : null;
+
+  // Quiet ingest-quota meter (CLAUDE.md §5): once the workspace is ~75% through its
+  // free parses, show a calm "N of M used" progress hint right where parsing happens.
+  // At the banner/wall levels the app-shell IngestQuotaNudge takes over with the CTA,
+  // so this meter only renders at the "subtle" level (no double-banner).
+  const showIngestMeter =
+    credits !== null &&
+    credits.ingestFreeLimit !== null &&
+    ingestNudgeLevel(credits.ingestUsed, credits.ingestFreeLimit) === "subtle";
+  const ingestPct =
+    credits !== null && credits.ingestFreeLimit
+      ? Math.min(100, Math.round((credits.ingestUsed / credits.ingestFreeLimit) * 100))
+      : 0;
 
   // A 402 race (ran out between load and submit): flip to the exhausted state,
   // re-sync from the server, and invite — never a generic error (§6.8).
   const handleNoCredits = useCallback(() => {
     setCredits((prev) =>
-      prev ? { ...prev, balance: 0, used: prev.dailyAllotment } : prev,
+      prev ? { ...prev, balance: 0, used: prev.monthlyAllotment } : prev,
     );
     refreshCredits();
     toast(
@@ -358,6 +376,31 @@ export function IngestSurface({
       {/* Out of AI parses → a calm upgrade INVITATION, never a paywall (§6.8). The
           DB/search/jobs/revenue stay free; only the parse submit is paused. */}
       {outOfCredits ? <UpgradeInvitation resets={resets} /> : null}
+
+      {/* Quiet ingest-quota progress (§5) — informational, not a gate. Escalates to
+          the app-shell IngestQuotaNudge once it crosses ~90%. */}
+      {showIngestMeter && credits ? (
+        <div className="mb-3" role="status">
+          <div className="flex items-baseline justify-between text-sm">
+            <span className="text-muted">Free parses used</span>
+            <span className="nums tabular-nums text-ink">
+              {credits.ingestUsed.toLocaleString()} of {credits.ingestFreeLimit!.toLocaleString()}
+            </span>
+          </div>
+          <div
+            className="mt-1.5 h-1.5 w-full overflow-hidden rounded-sm bg-subtle"
+            role="progressbar"
+            aria-valuenow={ingestPct}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div
+              className="h-full rounded-sm bg-brand transition-[width] duration-500 motion-reduce:transition-none"
+              style={{ width: `${ingestPct}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {/* The real drop target. The whole region is clickable + keyboard-activatable
           to open the file browser; the two buttons below scope folder/CSV picking. */}

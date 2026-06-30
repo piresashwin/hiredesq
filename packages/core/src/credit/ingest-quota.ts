@@ -17,7 +17,7 @@
  *
  * Pure domain logic — the persistence/lock lives in the worker + credits service.
  */
-export const INGEST_FREE_LIMIT = 1000; // seed default for the free tier; live ceiling in Plan table
+export const INGEST_FREE_LIMIT = 500; // seed default for the free tier; live ceiling in Plan table
 
 /**
  * Free-tier ingest is allowed while lifetime usage is under the limit. `limit`

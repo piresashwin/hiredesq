@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { dayKey, isNewDay, startOfNextDay } from "./day-period.js";
+import { dayKey, isNewDay, startOfNextDay } from "./period.js";
 
 // Day-boundary helpers for the lazy daily credit grant (CLAUDE.md §4).
 describe("dayKey", () => {

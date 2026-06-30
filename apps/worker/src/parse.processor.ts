@@ -21,6 +21,7 @@ import {
 import {
   BULK_BATCH_THRESHOLD,
   buildNotification,
+  ingestBannerThresholdCount,
   type CandidateProfile,
   type ParseJobData,
   type UploadKind,
@@ -96,8 +97,9 @@ export async function processParseJob(data: ParseJobData): Promise<{ candidateId
   // 1. Ingest-quota gate (§4 / Model B) — runs BEFORE any AI call. Parsing is free;
   //    this only enforces the free-tier abuse/onboarding ceiling. Atomically reserves
   //    the slot + claims the `processing` transition; throws IngestQuotaError (job
-  //    stays queued) when exhausted. `metered` says whether to release on failure.
-  const metered = await reserveIngestSlot(data.workspaceId, contentHash);
+  //    stays queued) when exhausted. The release-on-failure decision is derived from
+  //    durable DB state inside failParseAndReleaseSlot, so the return value is unused.
+  await reserveIngestSlot(data.workspaceId, contentHash);
 
   try {
     // 2. Build the parse source (route + fetch bytes / extract as needed).
@@ -120,15 +122,16 @@ export async function processParseJob(data: ParseJobData): Promise<{ candidateId
     await bumpBatch(data.workspaceId, data.batchId, { done: true, merged: outcome === "merged" });
     return { candidateId };
   } catch (err) {
-    // Release the reserved slot — never consume quota for work that produced no
-    // candidate (§4). The stored error is always a safe, enumerated string
-    // (toSafeParseError) — never err.message, which embeds model output / extracted
-    // resume fragments (PII, CLAUDE.md §2).
-    if (metered) await releaseIngestSlot(data.workspaceId);
-    await setParseStatus(data.workspaceId, contentHash, {
-      status: "failed",
-      error: toSafeParseError(err, "parse failed"),
-    });
+    // Atomically mark failed AND release the reserved slot in one transaction —
+    // never consume quota for work that produced no candidate (§4). The stored
+    // error is always a safe, enumerated string (toSafeParseError) — never
+    // err.message, which embeds model output / extracted resume fragments (PII,
+    // CLAUDE.md §2). failParseAndReleaseSlot derives the release decision from
+    // durable DB state (was the job processing? is the plan metered?), so a worker
+    // crash between the old separate releaseIngestSlot + setParseStatus calls can
+    // no longer leak a slot. Mirrors exactly how the batch path (batch.processor)
+    // handles failures. The in-memory `metered` flag is intentionally not threaded.
+    await failParseAndReleaseSlot(data.workspaceId, contentHash, toSafeParseError(err, "parse failed"));
     await bumpBatch(data.workspaceId, data.batchId, { failed: true });
     throw err;
   }
@@ -317,9 +320,8 @@ async function ensureRowParseJob(data: ParseJobData, rowHash: string): Promise<"
 async function parseMessyRowsLive(data: ParseJobData, messy: MessyRow[]): Promise<EmbedPair[]> {
   const embedded: EmbedPair[] = [];
   for (const { rowHash, text } of messy) {
-    let metered = false;
     try {
-      metered = await reserveIngestSlot(data.workspaceId, rowHash);
+      await reserveIngestSlot(data.workspaceId, rowHash);
       const parsed = await parseCandidate({ kind: "text", text });
       const { candidateId, outcome } = await upsertCandidate(data.workspaceId, parsed, data.source, {
         embed: false,
@@ -329,11 +331,11 @@ async function parseMessyRowsLive(data: ParseJobData, messy: MessyRow[]): Promis
       await markParseDone(data.workspaceId, rowHash, candidateId);
       await bumpBatch(data.workspaceId, data.batchId, { done: true, merged: outcome === "merged" });
     } catch (err) {
-      if (metered) await releaseIngestSlot(data.workspaceId);
-      await setParseStatus(data.workspaceId, rowHash, {
-        status: "failed",
-        error: toSafeParseError(err, "parse failed"),
-      });
+      // Atomically mark failed AND release the reserved slot in one transaction —
+      // mirrors the batch path and processParseJob (Finding 1 fix). The in-memory
+      // return value of reserveIngestSlot is intentionally not threaded; the release
+      // decision is derived from durable DB state (processing→failed CAS + plan check).
+      await failParseAndReleaseSlot(data.workspaceId, rowHash, toSafeParseError(err, "parse failed"));
       await bumpBatch(data.workspaceId, data.batchId, { failed: true });
     }
   }
@@ -558,12 +560,29 @@ export async function bumpBatch(
 
 // ─── Ingest quota gate (Model B, FEATURE-SET §F3 / CLAUDE.md §4) ───
 //
-// Parsing is FREE — it does NOT touch the daily credit balance (that meter gates
-// submission generation). The free tier is instead protected by a lifetime quota:
-// a generous onboarding/abuse ceiling so a backlog dump never paywalls on day 1.
+// Parsing is FREE — it does NOT touch the monthly credit balance (that meter gates
+// submission generation). The free and solo_pro tiers are protected by a per-period
+// quota: a generous ceiling so a backlog dump never paywalls on day 1.
 // Paid (team) plans are unmetered.
+//
+// Period design (UNIFIED KEY):
+//   desiredKey = (plan.ingestPeriod === "monthly") ? "YYYY-MM" (UTC) : "lifetime"
+//   For "lifetime" the key never changes → monotonic counter (free tier).
+//   For "monthly" the key rolls each UTC calendar month → auto-reset (solo_pro tier).
+//   For null (team) → unmetered, no counter touched.
 
-/** Thrown by the gate when a free workspace has exhausted its ingest quota. */
+/**
+ * `YYYY-MM` key for a UTC calendar month — local copy so the worker doesn't
+ * import across apps (apps/api lives separately). Formula is identical to the
+ * API's period.ts#monthKey; keep both in sync.
+ */
+function workerMonthKey(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+/** Thrown by the gate when a workspace has exhausted its ingest quota for the period. */
 export class IngestQuotaError extends Error {
   constructor() {
     super("ingest quota exhausted");
@@ -572,29 +591,43 @@ export class IngestQuotaError extends Error {
 }
 
 /**
- * Atomically RESERVE one ingest slot for a free workspace AND claim this job's
- * `processing` transition, in ONE transaction (§4). Runs BEFORE any provider call.
- * Replaces the old read-only gate + separate setParseStatus(processing): the lifetime
- * counter is incremented in the SAME conditional UPDATE that enforces the ceiling, so
- * concurrent in-flight parses can no longer all read the same pre-increment count and
- * overshoot the cap — each call either claims a slot or is rejected.
+ * Atomically RESERVE one ingest slot for a metered workspace AND claim this job's
+ * `processing` transition, in ONE transaction with a FOR UPDATE row lock (§4).
+ * Runs BEFORE any provider call.
+ *
+ * Period-aware: reads Plan.ingestPeriod to decide whether to use a fixed "lifetime"
+ * key (free tier — monotonic) or a "YYYY-MM" key (solo_pro — auto-resets monthly).
+ * If the account's stored ingestPeriodKey is stale (the month rolled), this resets
+ * the counter to 1 (the slot being reserved) and updates the key — all within the
+ * same locked transaction, so concurrent ingests of the same workspace serialize.
  *
  * Idempotent per content: only the transition INTO `processing` (from a
  * non-processing/non-done state) reserves, so a pg-boss retry of an already-claimed
  * job reuses the slot it holds instead of double-counting. Returns whether THIS call
  * metered a slot; the caller passes that to `releaseIngestSlot` on failure so a slot
- * is held only for live or successful work (a failed parse no longer consumes quota —
- * a deliberate behaviour change from the old "metered on done only" damper).
+ * is held only for live or successful work (a failed parse never consumes quota — §4).
  *
- * Throws IngestQuotaError when a free workspace is already at its ceiling; the whole
- * transaction rolls back, so the job stays unclaimed (mirrors the old gate). Paid
- * plans are unmetered. Tenant-scoped (§1).
+ * Throws IngestQuotaError when a metered workspace is already at its ceiling for the
+ * current period; the whole transaction rolls back, so the job stays unclaimed.
+ * Paid/unmetered plans return false (no slot held). Tenant-scoped (§1).
  */
 export async function reserveIngestSlot(workspaceId: string, contentHash: string): Promise<boolean> {
   return prisma.$transaction(async (tx) => {
+    // FOR UPDATE row lock — mirrors the credits.service.ts pattern. Serializes
+    // concurrent ingests of the same workspace so the read-modify-write on
+    // ingestUsed + ingestPeriodKey can't race (each call either claims or is
+    // rejected — the lock prevents two calls from both reading the same stale
+    // counter and both incrementing past the cap). workspace_id predicate (§1).
+    await tx.$queryRaw`SELECT id FROM credit_account WHERE workspace_id = ${workspaceId} FOR UPDATE`;
+
     const account = await tx.creditAccount.findUnique({
       where: { workspaceId },
-      select: { ingestUsedLifetime: true, workspace: { select: { plan: true } } },
+      select: {
+        ingestUsed: true,
+        ingestPeriodKey: true,
+        ingestNudgeKey: true,
+        workspace: { select: { plan: true } },
+      },
     });
     if (!account) throw new Error("no credit account for workspace");
 
@@ -605,39 +638,116 @@ export async function reserveIngestSlot(workspaceId: string, contentHash: string
       data: { status: "processing" },
     });
 
-    // Read the ingest ceiling from the Plan reference table — inside the same
-    // transaction so the ceiling is consistent with the increment that follows.
-    // null = unmetered (paid plans). CRITICAL: the ceiling is passed directly into
-    // the conditional UPDATE below, so enforcement stays atomic — no read-then-write.
+    // Read the ingest ceiling and period from the Plan reference table — inside the
+    // same locked transaction so the ceiling/period is consistent with the update below.
+    // null limit = unmetered (paid plans). ingestPeriod drives desiredKey.
     const planRow = await tx.plan.findUnique({
       where: { tier: account.workspace.plan },
-      select: { ingestFreeLimit: true },
+      select: { ingestFreeLimit: true, ingestPeriod: true },
     });
     const ingestFreeLimit = planRow?.ingestFreeLimit ?? null;
 
     if (ingestFreeLimit === null) return false; // unmetered tier — no metering needed
     if (claimed.count === 0) return false; // already reserved on a prior attempt
 
-    // Enforce the ceiling IN the increment: zero rows updated ⇒ at/over the cap.
-    // RACE-SAFE: the ceiling check and increment happen in the same conditional UPDATE.
-    const metered = await tx.creditAccount.updateMany({
-      where: { workspaceId, ingestUsedLifetime: { lt: ingestFreeLimit } },
-      data: { ingestUsedLifetime: { increment: 1 } },
-    });
-    if (metered.count === 0) throw new IngestQuotaError();
-    return true;
+    const ingestPeriod = planRow?.ingestPeriod ?? null;
+    const now = new Date();
+    const desiredKey = ingestPeriod === "monthly" ? workerMonthKey(now) : "lifetime";
+
+    // Determine current usage for this period. If the stored key is stale (the
+    // calendar month rolled for a "monthly" plan), usedThisPeriod resets to 0.
+    const currentUsed = account.ingestPeriodKey !== desiredKey ? 0 : account.ingestUsed;
+
+    if (currentUsed < ingestFreeLimit) {
+      const newUsed = currentUsed + 1;
+
+      // Approaching-limit upgrade nudge (CLAUDE.md §4/§5): the FIRST parse to bring
+      // usage to the banner threshold for this period raises ONE notification — and
+      // never again this period, guarded by ingestNudgeKey. Emitting in this same
+      // FOR UPDATE transaction (where the increment is serialized) makes it exactly
+      // once even under concurrent parses; the marker also survives the failure→
+      // release→re-cross oscillation that an "== thresholdCount" check would double-
+      // fire on. A stale key (the month rolled, or never nudged) re-arms it.
+      // Counts/ids only, never PII (§2). Workspace-level (userId null).
+      const crossesNudge =
+        newUsed >= ingestBannerThresholdCount(ingestFreeLimit) &&
+        account.ingestNudgeKey !== desiredKey;
+
+      // Reserve: claim one slot and stamp the (possibly new) period key. Stamp the
+      // nudge marker in the same write when we're about to notify.
+      await tx.creditAccount.updateMany({
+        where: { workspaceId },
+        data: {
+          ingestUsed: newUsed,
+          ingestPeriodKey: desiredKey,
+          ...(crossesNudge ? { ingestNudgeKey: desiredKey } : {}),
+        },
+      });
+
+      if (crossesNudge) {
+        const built = buildNotification("ingest_limit_approaching", {
+          used: newUsed,
+          limit: ingestFreeLimit,
+          period: ingestPeriod === "monthly" ? "monthly" : "lifetime",
+        });
+        await tx.notification.create({
+          data: {
+            workspaceId,
+            userId: null,
+            type: built.type,
+            title: built.title,
+            body: built.body,
+            data: built.data,
+          },
+        });
+      }
+
+      return true;
+    }
+
+    // At or over the cap for this period.
+    throw new IngestQuotaError();
   });
 }
 
 /**
  * Release a slot reserved by `reserveIngestSlot` when the parse later fails (§4).
  * Only call it with the `metered` flag `reserveIngestSlot` returned, so paid/reused
- * calls never decrement; the `gt: 0` guard keeps the counter from going negative.
+ * calls never decrement. Guards:
+ *   - Only decrements when the tier is metered (ingestFreeLimit !== null).
+ *   - Only decrements if the stored ingestPeriodKey still matches desiredKey — if
+ *     the period has already rolled, the reserved unit belonged to the old period
+ *     (which is gone); decrementing the fresh counter would underflow the new period.
+ *     The > 0 guard provides an additional floor against going negative.
  */
 export async function releaseIngestSlot(workspaceId: string): Promise<void> {
-  await prisma.creditAccount.updateMany({
-    where: { workspaceId, ingestUsedLifetime: { gt: 0 } },
-    data: { ingestUsedLifetime: { decrement: 1 } },
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM credit_account WHERE workspace_id = ${workspaceId} FOR UPDATE`;
+
+    const account = await tx.creditAccount.findUnique({
+      where: { workspaceId },
+      select: { ingestUsed: true, ingestPeriodKey: true, workspace: { select: { plan: true } } },
+    });
+    if (!account) return;
+
+    const planRow = await tx.plan.findUnique({
+      where: { tier: account.workspace.plan },
+      select: { ingestFreeLimit: true, ingestPeriod: true },
+    });
+    if (planRow?.ingestFreeLimit === null || planRow?.ingestFreeLimit === undefined) return; // unmetered
+
+    const ingestPeriod = planRow?.ingestPeriod ?? null;
+    const now = new Date();
+    const desiredKey = ingestPeriod === "monthly" ? workerMonthKey(now) : "lifetime";
+
+    // Only release if still in the same period and counter > 0.
+    if (account.ingestPeriodKey !== desiredKey) return; // period already rolled — safe no-op
+    if (account.ingestUsed <= 0) return; // floor guard
+
+    await tx.creditAccount.updateMany({
+      where: { workspaceId },
+      data: { ingestUsed: { decrement: 1 } },
+    });
   });
 }
 
@@ -648,7 +758,7 @@ export async function releaseIngestSlot(workspaceId: string): Promise<void> {
  * poll-timeout) AFTER items were reserved, leaving them `processing` with a slot held;
  * on the pg-boss retry the `metered` Set is empty, so the old `if (metered) release`
  * never freed those slots — a quota leak. This releases iff THIS call wins the
- * `processing → failed` transition AND the workspace is on the metered (free) plan,
+ * `processing → failed` transition AND the workspace is on a metered plan,
  * so a slot is freed exactly once and never for a paid (unmetered) item.
  *
  * Idempotent: a re-run finds the row already `failed`/`done`, records the error
@@ -662,6 +772,8 @@ export async function failParseAndReleaseSlot(
   error: string,
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM credit_account WHERE workspace_id = ${workspaceId} FOR UPDATE`;
+
     // Win the processing→failed transition. count>0 ⇒ a slot was held (reserve
     // increments only on the pending→processing claim), so THIS call releases it.
     const flipped = await tx.parseJob.updateMany({
@@ -677,28 +789,35 @@ export async function failParseAndReleaseSlot(
       });
       return;
     }
-    // Decide whether to release by reading Plan.ingestFreeLimit — same rule as
-    // reserveIngestSlot. null = unmetered (paid tiers): never touch the counter.
-    // This keeps failParseAndReleaseSlot consistent with the reserve logic regardless
-    // of which tiers are metered in the future.
+
+    // Decide whether to release by reading the Plan table and applying period logic.
+    // null limit = unmetered (paid tiers): never touch the counter.
     const account = await tx.creditAccount.findUnique({
       where: { workspaceId },
-      select: { workspace: { select: { plan: true } } },
+      select: { ingestUsed: true, ingestPeriodKey: true, workspace: { select: { plan: true } } },
     });
-    if (account) {
-      const planRow = await tx.plan.findUnique({
-        where: { tier: account.workspace.plan },
-        select: { ingestFreeLimit: true },
-      });
-      // ingestFreeLimit !== null ⇒ this tier is metered → release the held slot.
-      // The gt: 0 floor guard prevents the counter from going negative.
-      if (planRow?.ingestFreeLimit !== null && planRow?.ingestFreeLimit !== undefined) {
-        await tx.creditAccount.updateMany({
-          where: { workspaceId, ingestUsedLifetime: { gt: 0 } },
-          data: { ingestUsedLifetime: { decrement: 1 } },
-        });
-      }
-    }
+    if (!account) return;
+
+    const planRow = await tx.plan.findUnique({
+      where: { tier: account.workspace.plan },
+      select: { ingestFreeLimit: true, ingestPeriod: true },
+    });
+    if (planRow?.ingestFreeLimit === null || planRow?.ingestFreeLimit === undefined) return; // unmetered
+
+    const ingestPeriod = planRow?.ingestPeriod ?? null;
+    const now = new Date();
+    const desiredKey = ingestPeriod === "monthly" ? workerMonthKey(now) : "lifetime";
+
+    // Only release if still in the same period — if the period already rolled, the
+    // reserved unit belonged to the old period (gone); decrementing the fresh counter
+    // would underflow it. The > 0 guard provides a floor against negative counters.
+    if (account.ingestPeriodKey !== desiredKey) return;
+    if (account.ingestUsed <= 0) return;
+
+    await tx.creditAccount.updateMany({
+      where: { workspaceId },
+      data: { ingestUsed: { decrement: 1 } },
+    });
   });
 }
 

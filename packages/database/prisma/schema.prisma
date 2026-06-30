@@ -43,10 +43,14 @@ model Plan {
   // true for Team (billed per seat); false for Free / Solo Pro (flat rate).
   perSeat      Boolean  @default(false) @map("per_seat")
 
-  // Daily submission-generation credit allotment for this tier (Model B, §F3).
-  dailySubmissionAllotment Int @map("daily_submission_allotment")
-  // Lifetime free parses before ingest nudges an upgrade; null = unmetered (paid).
-  ingestFreeLimit          Int? @map("ingest_free_limit")
+  // Monthly submission-generation credit allotment for this tier (Model B, §F3).
+  // Resets at the UTC calendar-month boundary (v1 simplification — not billing-anchored).
+  monthlySubmissionAllotment Int @map("monthly_submission_allotment")
+  // Free parses per period before ingest nudges an upgrade; null = unmetered (paid).
+  ingestFreeLimit            Int? @map("ingest_free_limit")
+  // The ingest reset period: "lifetime" (free — monotonic), "monthly" (solo_pro — resets
+  // each UTC calendar month), null (team — unmetered, ingestFreeLimit must also be null).
+  ingestPeriod               String? @map("ingest_period")
   // Max workspace members; null = unlimited.
   seatLimit                Int? @map("seat_limit")
   // F10 AI-Mode monthly allowance in integer micro-USD (CLAUDE.md §4: never float).
@@ -283,17 +287,25 @@ model CreditAccount {
   id                 String    @id @default(cuid())
   workspaceId        String    @unique @map("workspace_id")
   balance            Int       @default(0)
-  // Free-tier DAILY allotment + when it was last granted. Lazy daily renewal:
-  // credits reset to dailyAllotment each day and do NOT roll over (§4). Under
-  // Model B (FEATURE-SET.md §F3) this DAILY meter gates SUBMISSION generation —
+  // Free-tier MONTHLY allotment + when it was last granted. Lazy monthly renewal:
+  // credits reset to monthlyAllotment each UTC calendar month and do NOT roll over (§4).
+  // Under Model B (FEATURE-SET.md §F3) this MONTHLY meter gates SUBMISSION generation —
   // the monetizable output — not ingest.
-  dailyAllotment     Int       @default(5) @map("daily_allotment")
+  // NOTE: reset uses a UTC calendar-month boundary (v1 simplification — not billing-anchored).
+  monthlyAllotment   Int       @default(5) @map("monthly_allotment")
   lastGrantedAt      DateTime? @map("last_granted_at")
   // Model B ingest meter (FEATURE-SET.md §F3): resume parsing is FREE, not drawn
-  // from the daily credits. This lifetime counter is the abuse/onboarding ceiling
-  // — a free workspace may parse up to INGEST_FREE_LIMIT (the onboarding grant)
-  // before ingest nudges an upgrade, so a backlog dump never paywalls on day 1.
-  ingestUsedLifetime Int       @default(0) @map("ingest_used_lifetime")
+  // from the monthly credits. This counter tracks usage within the current period.
+  // ingestPeriodKey drives the reset: "lifetime" = monotonic (never resets, free tier);
+  // "YYYY-MM" = resets when the calendar month rolls (solo_pro tier).
+  ingestUsed         Int       @default(0) @map("ingest_used")
+  ingestPeriodKey    String    @default("lifetime") @map("ingest_period_key")
+  // The period key for which the "approaching ingest limit" upgrade nudge has
+  // already fired (CLAUDE.md §4/§5). Set inside reserveIngestSlot's FOR UPDATE
+  // transaction when ingestUsed first reaches the banner threshold, so the
+  // notification fires EXACTLY ONCE per period. null = not yet nudged this period;
+  // when the period key rolls (monthly), it re-arms naturally (key mismatch).
+  ingestNudgeKey     String?   @map("ingest_nudge_key")
 
   workspace Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   entries   CreditLedgerEntry[]

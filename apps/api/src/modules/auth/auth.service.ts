@@ -83,9 +83,11 @@ const AVATAR_EXTENSIONS: Record<string, string> = {
   "image/webp": "webp",
 };
 
-// New free workspaces start with 5 AI credits, replenished daily (CLAUDE.md §4).
-// Credits drive upgrade intent, not COGS.
-const FREE_TIER_CREDITS = 5;
+// Fallback free-tier monthly submission allotment, used ONLY if the Plan reference
+// row is somehow absent (the migration seeds it, so this should never fire). The
+// live value is read from Plan.monthlySubmissionAllotment at signup so the limit
+// stays a data edit, not a deploy (CLAUDE.md §4). Credits drive upgrade intent, not COGS.
+const FREE_TIER_CREDITS = 20;
 
 // Screens that ship with a guided tour — the allowlist for the tourProgress JSON
 // column. Anything outside this set (or any non-boolean value) is dropped, so
@@ -257,13 +259,21 @@ export class AuthService {
     const membership = await tx.membership.create({
       data: { workspaceId: workspace.id, userId: user.id, role: "owner" },
     });
+    // Seed the monthly submission allotment from the Plan reference table (DB-driven —
+    // changing the free limit is a data edit, not a deploy). Falls back to the constant
+    // only if the seeded row is missing.
+    const freePlan = await tx.plan.findUnique({
+      where: { tier: "free" },
+      select: { monthlySubmissionAllotment: true },
+    });
+    const monthlyAllotment = freePlan?.monthlySubmissionAllotment ?? FREE_TIER_CREDITS;
     await tx.creditAccount.create({
       data: {
         workspaceId: workspace.id,
-        balance: FREE_TIER_CREDITS,
-        // Granted on creation so the lazy daily renewal doesn't immediately
-        // re-grant within the same UTC day (CreditsService.ensureDailyGrant).
-        dailyAllotment: FREE_TIER_CREDITS,
+        balance: monthlyAllotment,
+        // Granted on creation so the lazy monthly renewal doesn't immediately
+        // re-grant within the same UTC month (CreditsService.ensureMonthlyGrant).
+        monthlyAllotment,
         lastGrantedAt: new Date(),
       },
     });

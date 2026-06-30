@@ -192,5 +192,8 @@ export * from "./contracts.js";
 // Pure notification copy/payload builder (shared by api + worker).
 export * from "./notifications.js";
 
+// Ingest-quota upgrade nudge thresholds (shared by web + worker).
+export * from "./ingest-nudge.js";
+
 // Timezone → country resolution for signup defaults.
 export * from "./geo.js";

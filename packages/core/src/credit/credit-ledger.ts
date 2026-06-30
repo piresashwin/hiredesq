@@ -52,8 +52,8 @@ export class CreditAccount {
 
   /**
    * Renew the free-tier allotment — reset the available balance to the allotment
-   * (use-it-or-lose-it: yesterday's consumption is wiped, credits do NOT roll
-   * over). The CALLER decides *when* (a new period — a new UTC day — tracked by
+   * (use-it-or-lose-it: this month's unused credits are wiped, credits do NOT roll
+   * over). The CALLER decides *when* (a new period — a new UTC month — tracked by
    * lastGrantedAt); the aggregate just applies it, so balance is still only ever
    * mutated through the domain, never a direct row write (§4).
    *

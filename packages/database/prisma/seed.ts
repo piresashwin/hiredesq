@@ -6,52 +6,71 @@ import { PrismaClient, Prisma } from "@prisma/client";
 const prisma = new PrismaClient();
 
 const DEV_USER_EMAIL = "founder@hiredesq.dev";
-const FREE_TIER_CREDITS = 5; // daily free-tier allotment (MVP-SPEC §4)
+const FREE_TIER_CREDITS = 20; // monthly free-tier submission allotment (MVP-SPEC §4)
 
 async function main() {
   // ── Plan reference data (global pricing config, not tenant-scoped) ──
   // Upsert all three tiers idempotently. priceMonthly is Decimal (§3).
+  // ingestPeriod drives the ingest meter reset:
+  //   "lifetime" = monotonic (free — never resets)
+  //   "monthly"  = resets each UTC calendar month (solo_pro)
+  //   null       = unmetered (team)
   await prisma.plan.upsert({
     where: { tier: "free" },
-    update: {},
+    update: {
+      monthlySubmissionAllotment: 20,
+      ingestFreeLimit: 500,
+      ingestPeriod: "lifetime",
+    },
     create: {
       tier: "free",
       name: "Free",
       priceMonthly: new Prisma.Decimal("0.00"),
       currency: "USD",
       perSeat: false,
-      dailySubmissionAllotment: 5,
-      ingestFreeLimit: 1000,
+      monthlySubmissionAllotment: 20,
+      ingestFreeLimit: 500,
+      ingestPeriod: "lifetime",
       seatLimit: 1,
     },
   });
 
   await prisma.plan.upsert({
     where: { tier: "solo_pro" },
-    update: {},
+    update: {
+      monthlySubmissionAllotment: 100,
+      ingestFreeLimit: 200,
+      ingestPeriod: "monthly",
+    },
     create: {
       tier: "solo_pro",
       name: "Solo Pro",
       priceMonthly: new Prisma.Decimal("29.00"),
       currency: "USD",
       perSeat: false,
-      dailySubmissionAllotment: 50,
-      ingestFreeLimit: null, // null = unmetered ingest
+      monthlySubmissionAllotment: 100,
+      ingestFreeLimit: 200,
+      ingestPeriod: "monthly",
       seatLimit: 1,
     },
   });
 
   await prisma.plan.upsert({
     where: { tier: "team" },
-    update: {},
+    update: {
+      monthlySubmissionAllotment: 10000,
+      ingestFreeLimit: null,
+      ingestPeriod: null,
+    },
     create: {
       tier: "team",
       name: "Team",
       priceMonthly: new Prisma.Decimal("39.00"),
       currency: "USD",
       perSeat: true,
-      dailySubmissionAllotment: 10000,
+      monthlySubmissionAllotment: 10000,
       ingestFreeLimit: null, // null = unmetered ingest
+      ingestPeriod: null,    // null = unmetered
       seatLimit: 10,
     },
   });
@@ -81,8 +100,8 @@ async function main() {
         creditAccount: {
           create: {
             balance: FREE_TIER_CREDITS,
-            // Granted now so the lazy daily renewal doesn't re-grant today.
-            dailyAllotment: FREE_TIER_CREDITS,
+            // Granted now so the lazy monthly renewal doesn't re-grant this month.
+            monthlyAllotment: FREE_TIER_CREDITS,
             lastGrantedAt: new Date(),
           },
         },

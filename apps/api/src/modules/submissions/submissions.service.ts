@@ -23,7 +23,7 @@ import { toSharedSubmissionDto, toSubmissionDto } from "./submission.mapper.js";
 import { verdictLabel, verdictToStage, verdictToTrailKind } from "./verdict.js";
 import type { GenerateSubmissionDto } from "./submissions.dto.js";
 
-// One DAILY credit per generation (Model B, FEATURE-SET §F3 — the daily meter gates
+// One MONTHLY credit per generation (Model B, FEATURE-SET §F3 — the monthly meter gates
 // generation, not ingest).
 const SUBMISSION_COST = 1;
 
@@ -85,11 +85,11 @@ export class SubmissionsService {
       }
     }
 
-    // 2. Advisory daily-credit pre-check → graceful 402 (the reserve below is the
-    //    true gate). Model B: a generation costs a daily credit.
+    // 2. Advisory monthly-credit pre-check → graceful 402 (the reserve below is the
+    //    true gate). Model B: a generation costs a monthly credit.
     if (!(await this.credits.hasCreditsFor(workspaceId, SUBMISSION_COST))) {
       throw new HttpException(
-        { code: "no_credits", message: "You've used your free submissions for today." },
+        { code: "no_credits", message: "You've used your free submissions for this month." },
         402,
       );
     }
@@ -107,7 +107,7 @@ export class SubmissionsService {
       education: candidate.education as unknown as EducationEntry[],
     });
 
-    // 4. Reserve a daily credit — the TRUE gate (§4). Idempotent on the deterministic
+    // 4. Reserve a monthly credit — the TRUE gate (§4). Idempotent on the deterministic
     //    reservationKey; the locked aggregate can't oversell.
     const shareToken = randomBytes(24).toString("base64url");
     try {
@@ -115,7 +115,7 @@ export class SubmissionsService {
     } catch (err) {
       if (err instanceof InsufficientCreditsError) {
         throw new HttpException(
-          { code: "no_credits", message: "You've used your free submissions for today." },
+          { code: "no_credits", message: "You've used your free submissions for this month." },
           402,
         );
       }

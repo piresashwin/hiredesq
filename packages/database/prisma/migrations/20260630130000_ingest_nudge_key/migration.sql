@@ -1,0 +1,13 @@
+-- Ingest upgrade-nudge marker (CLAUDE.md §4/§5).
+--
+-- Records the ingest period key for which the "approaching your ingest limit"
+-- upgrade notification has already fired, so the worker raises it EXACTLY ONCE per
+-- period. The worker sets it inside reserveIngestSlot's FOR UPDATE transaction the
+-- first time ingest_used reaches the banner threshold for the current period.
+--
+-- Additive + nullable: existing rows default to NULL (= not yet nudged this period),
+-- so a backlog-heavy workspace already near its ceiling gets exactly one nudge on
+-- its next parse — never a retroactive flood. For "monthly" (solo_pro) the marker
+-- re-arms automatically when the calendar month rolls (the stored key stops matching
+-- the new period key). credit_account is tenant-scoped (workspace_id) per §1.
+ALTER TABLE "credit_account" ADD COLUMN "ingest_nudge_key" TEXT;

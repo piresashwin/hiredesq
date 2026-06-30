@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { CreditBalanceDto } from "@hiredesq/shared";
+import { ingestNudgeLevel, type CreditBalanceDto } from "@hiredesq/shared";
 import { cn } from "@/lib/cn";
 import { resetLabel } from "@/lib/format";
 import { api, ApiError } from "@/lib/api";
@@ -11,14 +11,14 @@ import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { CheckIcon } from "@/components/ui/Icon";
 
-// Credits / Upgrade surface (design-system §6.8, MVP-SPEC §4). Hitting the daily
+// Credits / Upgrade surface (design-system §6.8, MVP-SPEC §4). Hitting the monthly
 // cap is framed as an UPGRADE INVITATION, never a paywall. Under Model B (§F3) the
-// daily meter gates client-ready SUBMISSION generation; RESUME PARSING IS FREE
-// (metered separately by a generous lifetime ingest quota). The clean database,
-// search, jobs, and revenue are FREE FOREVER and must never read as gated.
-// Live-backed by getCredits(); the "Upgrade to Team" CTA opens real Stripe Checkout
-// (F8) and the Team state opens the Stripe billing portal — the page never shows a
-// card, only redirects to Stripe-hosted pages.
+// monthly meter gates client-ready SUBMISSION generation; RESUME PARSING IS FREE
+// (metered separately per period: lifetime for free, monthly for solo_pro, unlimited
+// for team). The clean database, search, jobs, and revenue are FREE FOREVER and must
+// never read as gated. Live-backed by getCredits(); the "Upgrade to Team" CTA opens
+// real Stripe Checkout (F8) and the Team state opens the Stripe billing portal —
+// the page never shows a card, only redirects to Stripe-hosted pages.
 
 const LOW_RATIO = 0.15;
 
@@ -158,18 +158,26 @@ function BillingContent({
   onUpgrade: () => void;
   onManageBilling: () => void;
 }) {
-  const { balance, dailyAllotment, used, resetsAt, plan, ingestUsedLifetime, ingestFreeLimit } =
+  const { balance, monthlyAllotment, used, resetsAt, plan, ingestUsed, ingestFreeLimit, ingestPeriod } =
     credits;
   const isTeam = plan === "team";
-  const ratio = dailyAllotment > 0 ? balance / dailyAllotment : 0;
+  const ratio = monthlyAllotment > 0 ? balance / monthlyAllotment : 0;
   // On Team the lifted allotment means the meter never reads as a near-cap nudge.
-  const low = !isTeam && dailyAllotment > 0 && ratio <= LOW_RATIO;
-  const usedPct = dailyAllotment > 0 ? Math.min(100, Math.round((used / dailyAllotment) * 100)) : 0;
+  const low = !isTeam && monthlyAllotment > 0 && ratio <= LOW_RATIO;
+  const usedPct = monthlyAllotment > 0 ? Math.min(100, Math.round((used / monthlyAllotment) * 100)) : 0;
   const resets = resetLabel(resetsAt);
-  // Model B (§F3): resume parsing is free; metered only on plans with an ingest
-  // ceiling. null = unmetered (paid tiers — unlimited parses).
+  // Model B (§F3): resume parsing is free; metered only on plans with an ingest ceiling.
+  // null = unmetered (paid tiers — unlimited parses).
   const ingestMetered = ingestFreeLimit !== null;
-  const parsesLeft = ingestMetered ? Math.max(0, ingestFreeLimit - ingestUsedLifetime) : null;
+  const parsesLeft = ingestMetered ? Math.max(0, ingestFreeLimit - ingestUsed) : null;
+
+  // Human-readable ingest copy varies by period tier.
+  const ingestCopy =
+    ingestPeriod === "lifetime"
+      ? `${parsesLeft!.toLocaleString()} of ${ingestFreeLimit!.toLocaleString()} free parses remaining (lifetime)`
+      : ingestPeriod === "monthly"
+        ? `${parsesLeft!.toLocaleString()} of ${ingestFreeLimit!.toLocaleString()} free parses remaining this month`
+        : null;
 
   return (
     <>
@@ -183,10 +191,10 @@ function BillingContent({
       >
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <div className="text-label uppercase text-muted">Client-ready submissions today</div>
+            <div className="text-label uppercase text-muted">Client-ready submissions this month</div>
             <div className="mt-1">
               <span className="nums text-display tabular-nums text-ink">{balance}</span>
-              <span className="nums text-h3 tabular-nums text-muted"> / {dailyAllotment}</span>
+              <span className="nums text-h3 tabular-nums text-muted"> / {monthlyAllotment}</span>
             </div>
           </div>
           <span
@@ -205,7 +213,7 @@ function BillingContent({
           aria-valuenow={usedPct}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label="Daily submissions used"
+          aria-label="Monthly submissions used"
         >
           <div
             className={cn(
@@ -219,8 +227,8 @@ function BillingContent({
           {isTeam ? (
             <>
               You&apos;re on <span className="font-medium text-ink">Team</span> — submissions are no
-              longer capped at the free daily limit.{" "}
-              <span className="nums tabular-nums">{used}</span> generated today
+              longer capped at the free monthly limit.{" "}
+              <span className="nums tabular-nums">{used}</span> generated this month
               {resets ? <> — your meter resets {resets}</> : null}.
             </>
           ) : low ? (
@@ -233,26 +241,46 @@ function BillingContent({
           ) : (
             <>
               <span className="nums tabular-nums">{used}</span> of{" "}
-              <span className="nums tabular-nums">{dailyAllotment}</span> submissions used
-              {resets ? <> — resets {resets}</> : null}. They reset every day — no rollover.
+              <span className="nums tabular-nums">{monthlyAllotment}</span> submissions used
+              {resets ? <> — resets {resets}</> : null}. They reset every month — no rollover.
             </>
           )}
         </p>
 
-        {/* Model B: resume parsing is free — metered on free tier, unlimited on paid. */}
+        {/* Model B: resume parsing is free — metered per period on metered tiers, unlimited on paid. */}
         <div className="mt-4 border-t border-line pt-3">
           <p className="text-sm text-muted">
             <span className="font-medium text-ink">Resume parsing is free.</span>{" "}
-            {ingestMetered ? (
-              <>
-                <span className="nums tabular-nums">{parsesLeft!.toLocaleString()}</span> of{" "}
-                <span className="nums tabular-nums">{ingestFreeLimit!.toLocaleString()}</span> free
-                parses remaining — paste or upload as much as you like to build your database.
-              </>
+            {ingestMetered && ingestCopy ? (
+              <>{ingestCopy} — paste or upload as much as you like to build your database.</>
             ) : (
               <>Unlimited parses on your plan — paste or upload as much as you like.</>
             )}
           </p>
+          {/* Progress bar so the ingest ceiling is glanceable, not just a sentence.
+              Warm (warning) once it crosses the upgrade-nudge threshold (~90%). */}
+          {ingestMetered ? (
+            <div
+              className="mt-2 h-1.5 w-full overflow-hidden rounded-sm bg-subtle"
+              role="progressbar"
+              aria-valuenow={Math.min(100, Math.round((ingestUsed / ingestFreeLimit!) * 100))}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Free parses used"
+            >
+              <div
+                className={cn(
+                  "h-full rounded-sm transition-[width] duration-500 motion-reduce:transition-none",
+                  ["banner", "wall"].includes(ingestNudgeLevel(ingestUsed, ingestFreeLimit))
+                    ? "bg-warning"
+                    : "bg-brand",
+                )}
+                style={{
+                  width: `${Math.min(100, Math.round((ingestUsed / ingestFreeLimit!) * 100))}%`,
+                }}
+              />
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -275,8 +303,8 @@ function BillingContent({
           current={plan === "free"}
           features={[
             ...FREE_FOREVER,
-            "Free resume parsing",
-            `${dailyAllotment} client-ready submissions / day`,
+            "500 parses (lifetime)",
+            `${monthlyAllotment} client-ready submissions / month`,
           ]}
         />
         <PlanCard

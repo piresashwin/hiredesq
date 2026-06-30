@@ -21,8 +21,9 @@ export class PlansService {
       priceMonthly: row.priceMonthly.toString(),
       currency: row.currency,
       perSeat: row.perSeat,
-      dailySubmissionAllotment: row.dailySubmissionAllotment,
+      monthlySubmissionAllotment: row.monthlySubmissionAllotment,
       ingestFreeLimit: row.ingestFreeLimit,
+      ingestPeriod: (row.ingestPeriod ?? null) as "lifetime" | "monthly" | null,
       seatLimit: row.seatLimit,
     }));
   }

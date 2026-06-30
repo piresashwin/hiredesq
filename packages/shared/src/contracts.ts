@@ -779,19 +779,22 @@ export type PlanTier = "free" | "solo_pro" | "team";
 
 export interface CreditBalanceDto {
   balance: number;
-  /** Free-tier DAILY allotment — resets every day, no rollover (§4). Under Model B
-   * (FEATURE-SET §F3) this meter gates SUBMISSION generation, not ingest. */
-  dailyAllotment: number;
-  /** Daily credits consumed today (dailyAllotment - balance, floored at 0). */
+  /** Free-tier MONTHLY allotment — resets every UTC calendar month, no rollover (§4).
+   * Under Model B (FEATURE-SET §F3) this meter gates SUBMISSION generation, not ingest. */
+  monthlyAllotment: number;
+  /** Monthly credits consumed this month (monthlyAllotment - balance, floored at 0). */
   used: number;
-  /** When the free daily credits reset (ISO — start of the next UTC day). */
+  /** When the free monthly credits reset (ISO — start of the next UTC month). */
   resetsAt: string;
   plan: PlanTier;
   /** Model B ingest meter (§F3): resume parsing is free up to `ingestFreeLimit`
-   * lifetime parses (the onboarding/abuse ceiling), then nudges an upgrade.
+   * parses per period (the onboarding/abuse ceiling), then nudges an upgrade.
    * null = unmetered (paid tiers with no ingest ceiling). */
-  ingestUsedLifetime: number;
+  ingestUsed: number;
   ingestFreeLimit: number | null;
+  /** The ingest reset period for this plan: "lifetime" (free — never resets),
+   * "monthly" (solo_pro — resets each UTC calendar month), or null (team — unmetered). */
+  ingestPeriod: "lifetime" | "monthly" | null;
 }
 
 /**
@@ -808,10 +811,12 @@ export interface PlanDto {
   currency: string;
   /** true for Team (billed per seat); false for Free / Solo Pro (flat rate). */
   perSeat: boolean;
-  /** Daily submission-generation credit allotment for this tier. */
-  dailySubmissionAllotment: number;
-  /** Lifetime free parses; null = unmetered ingest. */
+  /** Monthly submission-generation credit allotment for this tier. */
+  monthlySubmissionAllotment: number;
+  /** Free parses per period (lifetime for free tier, monthly for solo_pro); null = unmetered ingest. */
   ingestFreeLimit: number | null;
+  /** The ingest reset period: "lifetime" (free), "monthly" (solo_pro), or null (team = unmetered). */
+  ingestPeriod: "lifetime" | "monthly" | null;
   /** Max workspace members; null = unlimited. */
   seatLimit: number | null;
 }
@@ -878,7 +883,7 @@ export interface HomeOverviewDto {
  * enum) so a new trigger is a one-line addition both sides recompile against.
  * Phase 1 ships the first: a bulk upload finishing.
  */
-export type NotificationType = "bulk_import_complete";
+export type NotificationType = "bulk_import_complete" | "ingest_limit_approaching";
 
 /**
  * The structured payload stored on a notification. `link` is the in-app path the UI

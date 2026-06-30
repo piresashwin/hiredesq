@@ -92,6 +92,8 @@ function fakePrisma(seed: FakeUser[] = []) {
       },
     },
     creditAccount: { create: async () => ({}) },
+    // Signup seeds the monthly allotment from the Plan reference row (DB-driven).
+    plan: { findUnique: async () => ({ monthlySubmissionAllotment: 20 }) },
   };
 
   const prisma = {

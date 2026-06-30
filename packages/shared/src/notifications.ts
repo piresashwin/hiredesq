@@ -30,6 +30,15 @@ export interface NotificationParams {
     /** The pg-boss job id, when known (diagnostics only). */
     jobId?: string;
   };
+  ingest_limit_approaching: {
+    /** Parses used in the current period (the crossing count). */
+    used: number;
+    /** The ingest ceiling for the workspace's plan. */
+    limit: number;
+    /** Whether the ceiling is a permanent ("lifetime", free) or resetting
+     * ("monthly", solo_pro) one — drives the framing, not PII. */
+    period: "lifetime" | "monthly";
+  };
 }
 
 /** The rendered, persistable notification shape (sans id/workspace/recipient). */
@@ -73,6 +82,27 @@ export function buildNotification<T extends NotificationType>(
           failed: p.failed,
           partial: p.partial ?? false,
           ...(p.jobId !== undefined ? { jobId: p.jobId } : {}),
+        },
+      };
+    }
+    case "ingest_limit_approaching": {
+      const p = params as NotificationParams["ingest_limit_approaching"];
+      // Celebratory, counts-only — a milestone, not a scold (§2 — no PII). Framing
+      // differs by period: the free "lifetime" ceiling is a permanent wall to grow
+      // past; the solo_pro "monthly" ceiling resets, so it's a busy-month signal.
+      const lifetime = p.period === "lifetime";
+      return {
+        type,
+        title: lifetime ? "Your database is growing 🎉" : "Busy month 🎉",
+        body: lifetime
+          ? `You've parsed ${p.used} of ${p.limit} free candidates — upgrade to keep building without limits.`
+          : `You've used ${p.used} of ${p.limit} parses this month — go unmetered with a bigger plan.`,
+        data: {
+          // Land on the plan/upgrade screen.
+          link: "/settings/billing",
+          used: p.used,
+          limit: p.limit,
+          period: p.period,
         },
       };
     }

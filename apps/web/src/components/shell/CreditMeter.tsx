@@ -8,8 +8,8 @@ import { cn } from "@/lib/cn";
 import { resetLabel } from "@/lib/format";
 import { ClockIcon } from "@/components/ui/Icon";
 
-// Credit meter (design-system §6.8): a quiet pill in the top bar showing the daily
-// SUBMISSION allotment. Under Model B (§F3) the daily meter gates client-ready
+// Credit meter (design-system §6.8): a quiet pill in the top bar showing the monthly
+// SUBMISSION allotment. Under Model B (§F3) the monthly meter gates client-ready
 // SUBMISSION generation — resume parsing is free. Turns `warning` under ~15% —
 // never a blocking wall (MVP-SPEC §4). Fed by getCredits; degrades silently if the
 // call fails (it's chrome, not a gate).
@@ -31,7 +31,7 @@ export function CreditMeter() {
       .then((c) => {
         if (cancelled) return;
         setBalance(c.balance);
-        setAllotment(c.dailyAllotment);
+        setAllotment(c.monthlyAllotment);
         setResetsAt(c.resetsAt);
       })
       .catch(() => {
@@ -51,7 +51,7 @@ export function CreditMeter() {
   return (
     <Link
       href="/settings/billing"
-      aria-label={`${balance} client-ready submissions left today${resetsSuffix}. View credits and plan.`}
+      aria-label={`${balance} client-ready submissions left this month${resetsSuffix}. View credits and plan.`}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm font-medium transition",
         low
@@ -61,12 +61,12 @@ export function CreditMeter() {
       title={
         low
           ? `${balance} submissions left — running low${resetsSuffix}. View plan.`
-          : `${balance} submissions left today${resetsSuffix}. View plan.`
+          : `${balance} submissions left this month${resetsSuffix}. View plan.`
       }
     >
       <ClockIcon className="h-3.5 w-3.5" />
       <span className="nums tabular-nums">{balance}</span>
-      <span className="sr-only">client-ready submissions remaining today</span>
+      <span className="sr-only">client-ready submissions remaining this month</span>
     </Link>
   );
 }
